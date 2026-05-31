@@ -2,10 +2,10 @@
 // includes/connection.php — central MySQL connection (PDO).
 // Edit credentials below to match your local / cPanel server.
 
-$DB_HOST = 'localhost';
-$DB_NAME = 'prosensia';
-$DB_USER = 'root';
-$DB_PASS = '';
+$DB_HOST = 'premium281.web-hosting.com';
+$DB_NAME = 'prosdfwo_internship_batch3';
+$DB_USER = 'prosdfwo_internship_batch3';
+$DB_PASS = 'InternshipBatch3';
 $DB_CHARSET = 'utf8mb4';
 
 try {
