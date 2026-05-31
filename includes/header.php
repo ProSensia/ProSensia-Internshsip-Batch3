@@ -1,5 +1,4 @@
 <?php
-// includes/header.php — top of every page.
 require_once __DIR__ . '/auth.php';
 require_login();
 $user = current_user();
@@ -10,8 +9,9 @@ $page_label = $page_label ?? 'Overview';
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title><?= e($page_title) ?> — ProSensia</title>
+<link rel="icon" type="image/png" href="<?= logo_url() ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -22,9 +22,12 @@ $page_label = $page_label ?? 'Overview';
 <body>
 <div class="app">
 <?php require __DIR__ . '/sidebar.php'; ?>
+<div class="sidebar-backdrop" data-sidebar-close></div>
 <div class="main">
   <div class="topbar">
-    <div class="crumb"><?= e($page_section) ?> <span class="mx-2">/</span> <b><?= e($page_label) ?></b></div>
+    <button class="btn btn-ghost btn-sm sidebar-toggle d-lg-none" data-sidebar-open aria-label="Menu"><i class="bi bi-list" style="font-size:22px"></i></button>
+    <div class="crumb d-none d-sm-block"><?= e($page_section) ?> <span class="mx-2">/</span> <b><?= e($page_label) ?></b></div>
+    <div class="d-sm-none brand-mini"><img src="<?= logo_url() ?>" alt="ProSensia" height="28"></div>
     <div class="user-chip">
       <div class="text-end d-none d-md-block">
         <div style="font-size:13px"><?= e($user['name']) ?></div>

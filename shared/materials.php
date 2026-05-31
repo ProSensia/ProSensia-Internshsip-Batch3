@@ -1,56 +1,68 @@
 <?php
 $page_title='Materials'; $page_section='Workspace'; $page_label='Materials';
 require __DIR__ . '/../includes/header.php';
-require_login();
 $role = $user['role'];
+$can_post = in_array($role,['mentor','management','super_admin'],true);
 
-if ($_SERVER['REQUEST_METHOD']==='POST' && in_array($role,['super_admin','management'],true)) {
-    $pdo->prepare('INSERT INTO materials(title,kind,url,module,meta) VALUES(?,?,?,?,?)')
-        ->execute([$_POST['title'],$_POST['kind'],$_POST['url'],$_POST['module'],$_POST['meta']]);
+if ($_SERVER['REQUEST_METHOD']==='POST' && $can_post) {
+  $a=$_POST['action']??'';
+  if ($a==='add') {
+    $pdo->prepare('INSERT INTO materials(title,kind,url,module,meta,team_id,posted_by) VALUES(?,?,?,?,?,?,?)')
+        ->execute([trim($_POST['title']),$_POST['kind']?:'link',trim($_POST['url']),trim($_POST['module']),trim($_POST['meta']),
+                   ($_POST['team_id']?(int)$_POST['team_id']:null),$user['id']]);
     flash('Material added.');
-    header('Location: '.base_url('shared/materials.php')); exit;
+  }
+  if ($a==='delete') { $pdo->prepare('DELETE FROM materials WHERE id=?')->execute([(int)$_POST['id']]); flash('Removed.'); }
+  header('Location: '.base_url('shared/materials.php')); exit;
 }
-$mats = $pdo->query('SELECT * FROM materials ORDER BY created_at DESC')->fetchAll();
-$icons = ['pdf'=>'bi-file-earmark-pdf','video'=>'bi-play-btn','link'=>'bi-link-45deg'];
+$teams = $pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll();
+$items = $pdo->query('SELECT m.*, t.name AS team_name, u.name AS author FROM materials m
+                      LEFT JOIN teams t ON t.id=m.team_id
+                      LEFT JOIN users u ON u.id=m.posted_by
+                      ORDER BY m.created_at DESC')->fetchAll();
 ?>
-<div class="d-flex justify-content-between align-items-end mb-4">
-  <div><h1 class="serif" style="font-size:38px;margin:0">Learning Materials</h1>
-  <p class="muted mb-0">PDFs, videos, and external resources for your track.</p></div>
-  <?php if (in_array($role,['super_admin','management'],true)): ?>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMat"><i class="bi bi-plus-lg me-1"></i>Add material</button>
-  <?php endif; ?>
-</div>
+<h1 class="serif" style="font-size:34px">Materials library</h1>
+<p class="muted">Lectures, references, and PDFs. <?= $can_post?'Mentors and management can publish to a team or to everyone.':'Mentors publish new content here.' ?></p>
 
-<div class="row g-3">
-<?php foreach($mats as $m): ?>
-  <div class="col-md-4">
-    <a class="glass card-pad d-block h-100" href="<?= e($m['url']) ?>" target="_blank" style="color:inherit">
+<?php if($can_post): ?>
+<div class="glass card-pad mb-3">
+  <h5 class="serif mb-3"><i class="bi bi-plus-circle me-2"></i>Add new material</h5>
+  <form method="post" class="row g-2">
+    <input type="hidden" name="action" value="add">
+    <div class="col-md-4"><input class="form-control" name="title" placeholder="Title" required></div>
+    <div class="col-md-2"><select class="form-select" name="kind"><option value="link">Link</option><option value="pdf">PDF</option><option value="video">Video</option></select></div>
+    <div class="col-md-3"><input class="form-control" name="url" placeholder="URL (https://…)" required></div>
+    <div class="col-md-3"><input class="form-control" name="module" placeholder="Module / topic"></div>
+    <div class="col-md-3"><input class="form-control" name="meta" placeholder="Meta (size, duration)"></div>
+    <div class="col-md-6"><select class="form-select" name="team_id"><option value="">All teams / everyone</option><?php foreach($teams as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-3"><button class="btn btn-primary w-100"><i class="bi bi-cloud-upload me-1"></i>Publish</button></div>
+  </form>
+</div>
+<?php endif; ?>
+
+<div class="bento">
+  <?php foreach($items as $m):
+    $icon=['pdf'=>'bi-file-earmark-pdf','video'=>'bi-play-circle','link'=>'bi-link-45deg'][$m['kind']]??'bi-link-45deg';
+  ?>
+    <div class="glass card-pad span-4">
       <div class="d-flex align-items-start gap-3">
-        <div class="b-primary badge" style="font-size:18px;padding:10px 12px"><i class="bi <?= $icons[$m['kind']] ?? 'bi-file' ?>"></i></div>
-        <div>
-          <div class="small-cap"><?= e($m['module']) ?> · <?= e($m['meta']) ?></div>
-          <h5 class="serif mt-1 mb-0"><?= e($m['title']) ?></h5>
+        <i class="bi <?= $icon ?>" style="font-size:28px;color:var(--primary-glow)"></i>
+        <div class="flex-grow-1">
+          <h5 class="serif mb-1"><?= e($m['title']) ?></h5>
+          <div class="muted" style="font-size:12px"><?= e($m['module']) ?> · <?= e($m['meta']) ?></div>
+          <div class="muted" style="font-size:11px;margin-top:4px">
+            <?= $m['team_name'] ? '<span class="badge b-primary">'.e($m['team_name']).'</span>' : '<span class="badge b-muted">All teams</span>' ?>
+            <?php if($m['author']): ?> · by <?= e($m['author']) ?><?php endif; ?>
+          </div>
         </div>
       </div>
-    </a>
-  </div>
-<?php endforeach; ?>
-</div>
-
-<div class="modal fade" id="addMat" tabindex="-1"><div class="modal-dialog"><div class="modal-content" style="background:#11141b;border:1px solid var(--border-strong);color:var(--text);border-radius:18px">
-  <form method="post">
-    <div class="modal-header border-0"><h5 class="serif m-0">Add material</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="mb-3"><label class="form-label">Title</label><input class="form-control" name="title" required></div>
-      <div class="mb-3"><label class="form-label">Type</label><select class="form-select" name="kind">
-        <option value="pdf">PDF</option><option value="video">Video</option><option value="link">Link</option>
-      </select></div>
-      <div class="mb-3"><label class="form-label">URL</label><input class="form-control" name="url" required></div>
-      <div class="row"><div class="col-md-6 mb-3"><label class="form-label">Module</label><input class="form-control" name="module"></div>
-      <div class="col-md-6 mb-3"><label class="form-label">Meta (size / duration)</label><input class="form-control" name="meta"></div></div>
+      <div class="mt-3 d-flex gap-2">
+        <a href="<?= e($m['url']) ?>" target="_blank" class="btn btn-outline-light btn-sm flex-grow-1"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+        <?php if($can_post): ?>
+        <form method="post" onsubmit="return confirm('Delete?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$m['id'] ?>"><button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button></form>
+        <?php endif; ?>
+      </div>
     </div>
-    <div class="modal-footer border-0"><button class="btn btn-primary">Add</button></div>
-  </form>
-</div></div></div>
-
+  <?php endforeach; ?>
+</div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
