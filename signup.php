@@ -13,12 +13,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $uni=trim($_POST['university']??''); $deg=trim($_POST['degree']??''); $grad=trim($_POST['graduation_year']??'');
   $skills=trim($_POST['skills']??''); $bio=trim($_POST['bio']??'');
   $gh=trim($_POST['github']??''); $li=trim($_POST['linkedin']??''); $pf=trim($_POST['portfolio']??'');
+  $dept=trim($_POST['department']??'');
 
   // Validate avatar is present and uploaded correctly
   if (empty($_FILES['avatar']['name']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
     $err = 'Profile picture is required. Please upload a clear front-facing photo.';
   } elseif (!$name||!$email||strlen($pass)<6) {
     $err = 'Name, email, and a password (6+ chars) are required.';
+  } elseif (empty($father) || empty($cnic) || empty($addr) || empty($reg) || empty($sem) || empty($dept)) {
+    $err = 'Father name, CNIC, address, registration number, semester, and department are required for Form C.';
   } else {
     $s=$pdo->prepare('SELECT id FROM users WHERE email=?'); $s->execute([$email]);
     if ($s->fetch()) { $err = 'An account with that email already exists.'; }
@@ -51,12 +54,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       if (move_uploaded_file($_FILES['avatar']['tmp_name'], $dir.'/'.$fname)) {
         $avatarPath = 'assets/uploads/avatars/'.$fname;
       } else {
-        // If upload fails, delete the user we just created to keep data clean
         $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);
         $err = 'Failed to upload profile picture. Please try again.';
       }
     } else {
-      // Invalid file type
       $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);
       $err = 'Invalid image format. Please upload JPG, PNG, WEBP, or GIF.';
     }
@@ -65,12 +66,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     if (empty($err) && $avatarPath) {
       $pdo->prepare('INSERT INTO profiles(
         user_id, avatar_path, father_name, cnic, reg_number, semester, phone,
-        city, address, university, degree, graduation_year, skills,
+        city, address, university, degree, graduation_year, department, skills,
         github, linkedin, portfolio, bio
-      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([
           $uid, $avatarPath, $father, $cnic, $reg, $sem, $phone,
-          $city, $addr, $uni, $deg, $grad, $skills,
+          $city, $addr, $uni, $deg, $grad, $dept, $skills,
           $gh, $li, $pf, $bio
         ]);
       $ok = true;
@@ -126,16 +127,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 2: personal details -->
+      <!-- Step 2: personal details (required for Form C) -->
       <section class="wizard-pane d-none" data-step="2">
         <h2 class="serif">Personal details</h2>
         <p class="lead-muted">Step 2 of 5 — only the super admin will see these</p>
         <div class="row g-3">
-          <div class="col-md-6"><label class="form-label">Father name</label><input class="form-control" name="father_name"></div>
-          <div class="col-md-6"><label class="form-label">CNIC #</label><input class="form-control" name="cnic" placeholder="35202-1234567-1"></div>
+          <div class="col-md-6"><label class="form-label">Father name <span class="text-danger">*</span></label><input class="form-control" name="father_name" required></div>
+          <div class="col-md-6"><label class="form-label">CNIC # <span class="text-danger">*</span></label><input class="form-control" name="cnic" placeholder="35202-1234567-1" required></div>
           <div class="col-md-6"><label class="form-label">Contact number</label><input class="form-control" name="phone"></div>
           <div class="col-md-6"><label class="form-label">City</label><input class="form-control" name="city"></div>
-          <div class="col-12"><label class="form-label">Present address</label><textarea class="form-control" name="address" rows="2"></textarea></div>
+          <div class="col-12"><label class="form-label">Present address <span class="text-danger">*</span></label><textarea class="form-control" name="address" rows="2" required></textarea></div>
         </div>
         <div class="mt-4 d-flex justify-content-between">
           <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
@@ -143,12 +144,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 3: Profile Picture (Mandatory) + Academic Information -->
+      <!-- Step 3: Profile Picture (Mandatory) + Academic Information (required for Form C) -->
       <section class="wizard-pane d-none" data-step="3">
         <h2 class="serif">Profile Picture & Academics</h2>
         <p class="lead-muted">Step 3 of 5 — upload your photo and academic details</p>
         
-        <!-- Avatar Upload Section -->
+        <!-- Avatar Upload Section (required) -->
         <div class="row g-3 mb-4">
           <div class="col-12">
             <label class="form-label">Profile Picture <span class="text-danger">*</span></label>
@@ -163,12 +164,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           </div>
         </div>
         
-        <!-- Academic Section -->
+        <!-- Academic Section (reg_number, semester, department are required) -->
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label">University</label><input class="form-control" name="university"></div>
           <div class="col-md-6"><label class="form-label">Degree / Program</label><input class="form-control" name="degree"></div>
-          <div class="col-md-4"><label class="form-label">Registration #</label><input class="form-control" name="reg_number" placeholder="FA21-BCS-045"></div>
-          <div class="col-md-4"><label class="form-label">Semester</label><input class="form-control" name="semester" placeholder="7th"></div>
+          <div class="col-md-4"><label class="form-label">Registration # <span class="text-danger">*</span></label><input class="form-control" name="reg_number" placeholder="FA21-BCS-045" required></div>
+          <div class="col-md-4"><label class="form-label">Semester <span class="text-danger">*</span></label><input class="form-control" name="semester" placeholder="7th" required></div>
+          <div class="col-md-4"><label class="form-label">Department <span class="text-danger">*</span></label><input class="form-control" name="department" placeholder="Electrical and Computer Engineering" required></div>
           <div class="col-md-4"><label class="form-label">Graduation year</label><input class="form-control" name="graduation_year" placeholder="2026"></div>
         </div>
         
@@ -178,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 4: Skills -->
+      <!-- Step 4: Skills (optional) -->
       <section class="wizard-pane d-none" data-step="4">
         <h2 class="serif">Skills & Links</h2>
         <p class="lead-muted">Step 4 of 5 — tell us what you bring</p>
