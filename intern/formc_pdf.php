@@ -1,7 +1,16 @@
 <?php
-// formc_pdf.php — Fixed version with absolute URLs and safe logo loading
+// DEBUG VERSION - Remove after fixing
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
+
+// Test if FPDF exists
+if (!file_exists(__DIR__ . '/../lib/fpdf.php')) {
+    die('FPDF library not found at ' . __DIR__ . '/../lib/fpdf.php');
+}
 require_once __DIR__ . '/../lib/fpdf.php';
 
 $me = current_user();
@@ -9,7 +18,7 @@ $role = $me['role'];
 
 $target = (in_array($role, ['super_admin', 'management']) && !empty($_GET['uid'])) ? (int)$_GET['uid'] : $me['id'];
 
-// Fetch user and profile
+// Fetch data
 $u = $pdo->prepare('SELECT u.*, p.* FROM users u LEFT JOIN profiles p ON p.user_id = u.id WHERE u.id = ?');
 $u->execute([$target]);
 $student = $u->fetch();
@@ -30,36 +39,36 @@ if ($role === 'intern' && (!$f || $f['status'] !== 'approved')) {
 // Generate reference number
 $refNumber = 'ProSensiaB' . str_pad(3000 + (int)($f['id'] ?? 0), 4, '0', STR_PAD_LEFT);
 
-// ***** FIX: Build absolute verification URL *****
+// Build absolute verification URL
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'];
-$baseUrl = $protocol . '://' . $host . dirname($_SERVER['SCRIPT_NAME']);
-$verifyUrl = rtrim($baseUrl, '/') . '/verify_formc.php?ref=' . urlencode($refNumber);
+$requestUri = $_SERVER['REQUEST_URI'];
+$scriptDir = dirname($requestUri);
+$baseUrl = $protocol . '://' . $host . rtrim($scriptDir, '/');
+$verifyUrl = $baseUrl . '/verify_formc.php?ref=' . urlencode($refNumber);
 
-// QR code generation (with temp directory)
+// QR code temp file
 $tempDir = __DIR__ . '/../temp';
 if (!is_dir($tempDir)) mkdir($tempDir, 0775, true);
 $qrTempFile = $tempDir . '/qr_' . uniqid() . '.png';
 $qrOk = false;
 
-// Try to use phpqrcode if available, otherwise fallback to QuickChart
-if (class_exists('QRcode')) {
-    QRcode::png($verifyUrl, $qrTempFile, QR_ECLEVEL_L, 4);
-    if (file_exists($qrTempFile)) $qrOk = true;
+// Try fallback QR (no external library required)
+$qrUrl = 'https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=200&margin=2';
+$qrData = @file_get_contents($qrUrl);
+if ($qrData !== false && file_put_contents($qrTempFile, $qrData)) {
+    $qrOk = true;
 } else {
-    $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=200&margin=2';
-    $qrData = @file_get_contents($qrUrl);
-    if ($qrData !== false && file_put_contents($qrTempFile, $qrData)) {
-        $qrOk = true;
-    } else {
-        $qrTempFile = null;
-    }
+    $qrTempFile = null;
 }
 
-// ***** FIX: Safe logo loading – skip if file not found *****
+// Partner logo - safely
 $partnerLogoPath = null;
-$partnerLogoSetting = setting('partner_logo_path', '');
-if (!empty($partnerLogoSetting)) {
+// We need to get setting from database directly because setting() may not exist
+$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
+$stmt->execute();
+$partnerLogoSetting = $stmt->fetchColumn();
+if ($partnerLogoSetting) {
     $fullPath = __DIR__ . '/../' . ltrim($partnerLogoSetting, '/');
     if (file_exists($fullPath)) {
         $partnerLogoPath = $fullPath;
@@ -91,7 +100,6 @@ $pdf->AddPage();
 $pdf->SetFont('Helvetica', '', 10);
 
 // ==================== TOP SECTION ====================
-// Partner logo (left)
 if ($pdf->partnerLogo) {
     $pdf->Image($pdf->partnerLogo, 15, 15, 40);
 } else {
@@ -99,13 +107,11 @@ if ($pdf->partnerLogo) {
     $pdf->SetFont('Helvetica', 'B', 10);
     $pdf->Cell(40, 10, 'Pak-Austria Fachhochschule', 0, 0, 'L');
 }
-// Reference number (right)
 $pdf->SetY(15);
 $pdf->SetX(150);
 $pdf->SetFont('Helvetica', 'B', 11);
 $pdf->Cell(45, 8, 'Ref: ' . $pdf->refNumber, 0, 1, 'R');
 
-// University header text
 $pdf->SetY(25);
 $pdf->SetFont('Helvetica', 'B', 12);
 $pdf->Cell(0, 6, 'Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK', 0, 1, 'C');
@@ -116,7 +122,7 @@ $pdf->SetFont('Helvetica', 'B', 14);
 $pdf->Cell(0, 8, 'Internship Placement Proforma', 0, 1, 'C');
 $pdf->Ln(6);
 
-// ==================== STUDENT INFORMATION ====================
+// Student Information
 $pdf->SetFont('Helvetica', 'B', 11);
 $pdf->Cell(0, 8, 'Student Information:', 0, 1);
 $pdf->SetFont('Helvetica', '', 10);
@@ -163,7 +169,7 @@ $pdf->Cell(35, $lineH, 'Present Address:', 0, 0);
 $pdf->MultiCell(160, $lineH, $student['address'] ?: '_________________________', 0, 'L');
 $pdf->Ln(4);
 
-// ==================== EMPLOYER SECTION ====================
+// Employer Section
 $pdf->SetFont('Helvetica', 'B', 11);
 $pdf->Cell(0, 8, 'To be filled by Internship Industry/Organization Representative', 0, 1);
 $pdf->SetFont('Helvetica', '', 10);
@@ -190,12 +196,12 @@ $dates = ($f['start_date'] ?? '') . '   to   ' . ($f['end_date'] ?? '');
 $pdf->Cell(130, $lineH, $dates ?: '_________________________', 0, 1);
 $pdf->Ln(8);
 
-// ==================== DECLARATION ====================
+// Declaration
 $pdf->SetFont('Helvetica', 'I', 10);
 $pdf->MultiCell(0, 6, 'I hereby declare that the above-mentioned information is correct to the best of my knowledge.');
 $pdf->Ln(8);
 
-// ==================== DIGITAL SIGNATURE NOTICE ====================
+// Digital signature notice
 $pdf->SetFont('Helvetica', '', 10);
 $pdf->MultiCell(0, 6, 'This document is digitally signed and requires no physical stamp as it is generated directly from the ProSensia portal.');
 $pdf->Ln(4);
@@ -205,7 +211,7 @@ $pdf->SetFont('Helvetica', '', 9);
 $pdf->Cell(0, 5, 'Date: ' . date('Y-m-d H:i:s'), 0, 1, 'L');
 $pdf->Ln(8);
 
-// ==================== QR CODE ====================
+// QR Code
 if ($pdf->qrFile && file_exists($pdf->qrFile)) {
     $pdf->Image($pdf->qrFile, 160, $pdf->GetY() + 5, 30);
     $pdf->SetXY(160, $pdf->GetY() + 38);
@@ -216,7 +222,7 @@ if ($pdf->qrFile && file_exists($pdf->qrFile)) {
     });
 }
 
-// ==================== SIGNATURE LINES ====================
+// Signature lines
 $y = $pdf->GetY() + 20;
 $pdf->SetFont('Helvetica', '', 10);
 $pdf->Line(20, $y, 90, $y);
