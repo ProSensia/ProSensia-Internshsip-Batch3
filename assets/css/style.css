@@ -19,8 +19,8 @@ a:hover{color:var(--primary)}
 /* ===== Layout ===== */
 .app{display:flex;min-height:100vh}
 .sidebar{width:248px;background:rgba(17,20,27,.96);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;backdrop-filter:blur(10px);z-index:50;transition:transform .25s ease}
-.sidebar .brand{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center}
-.sidebar .brand-logo{max-width:170px;height:auto;display:block;filter:drop-shadow(0 2px 8px rgba(212,168,76,.2))}
+.sidebar .brand{height:64px;padding:0 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+.sidebar .brand-logo{max-height:36px;max-width:160px;width:auto;height:auto;display:block;filter:drop-shadow(0 2px 8px rgba(212,168,76,.2))}
 .sidebar .nav-section{padding:14px 12px 4px;font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
 .sidebar .nav-link{display:flex;align-items:center;gap:10px;padding:9px 12px;margin:2px 8px;color:var(--text);border-radius:8px;font-size:14px;border:1px solid transparent}
 .sidebar .nav-link:hover{background:var(--surface-2)}
