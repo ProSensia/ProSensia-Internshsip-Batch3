@@ -67,6 +67,10 @@ function logo_url() {
     $p = setting('logo_path', 'assets/img/prosensia-logo.png');
     return base_url($p);
 }
+function fav_url() {
+    $p = setting('fav_path', 'assets/img/prosensia-favicon.png');
+    return base_url($p);
+}
 function partner_logo_url() {
     $p = setting('partner_logo_path', '');
     return $p ? base_url($p) : '';
