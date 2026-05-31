@@ -11,7 +11,7 @@ $page_label = $page_label ?? 'Overview';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title><?= e($page_title) ?> — ProSensia</title>
-<link rel="icon" type="image/png" href="?v=<?= time() ?>favIcon.png">
+<link rel="icon" type="image/png" href="<?= logo_url() ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
