@@ -173,7 +173,7 @@ a:hover{color:var(--primary)}
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
 
 /* ===== Footer (Phase 1) ===== */
-.app-footer{margin:24px -24px -24px;padding:12px 24px;border-top:1px solid var(--border);background:rgba(17,20,27,.6);color:var(--muted)}
+/* .app-footer{margin:24px -24px -24px;padding:12px 24px;border-top:1px solid var(--border);background:rgba(17,20,27,.6);color:var(--muted)} */
 
 /* ===== Signup wizard slide animation ===== */
 .wizard-form{position:relative;overflow:hidden}
