@@ -49,12 +49,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     <a href="<?= base_url('signup.php') ?>" class="btn btn-outline-light w-100"><i class="bi bi-person-plus me-1"></i> Create an account</a>
 
     <div class="divider"></div>
-    <p class="text-center muted small mb-2">Demo accounts (password: <code>password123</code>)</p>
-    <div class="d-flex flex-wrap gap-2 justify-content-center">
-      <?php foreach([['admin@prosensia.com','Admin'],['manager@prosensia.com','Mgmt'],['mentor@prosensia.com','Mentor'],['intern@prosensia.com','Intern']] as $d): ?>
-        <span class="demo-chip" onclick="document.querySelector('[name=email]').value='<?= $d[0] ?>';document.querySelector('[name=password]').value='password123'"><?= $d[1] ?></span>
-      <?php endforeach; ?>
-    </div>
+    
   </div>
 </div>
 </body></html>
