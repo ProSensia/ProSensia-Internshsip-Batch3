@@ -111,22 +111,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     <?php if ($err): ?><div class="alert alert-danger" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#fecaca;border-radius:10px;font-size:13px"><?= e($err) ?></div><?php endif; ?>
 
     <form method="post" enctype="multipart/form-data" id="signupForm" novalidate class="wizard-form">
-      <!-- Step 1: Profile Picture (Mandatory) -->
+      <!-- Step 1: account credentials -->
       <section class="wizard-pane" data-step="1">
-        <h2 class="serif">Profile picture</h2>
-        <p class="lead-muted">Step 1 of 5 — upload a clear face photo</p>
+        <h2 class="serif">Create your account</h2>
+        <p class="lead-muted">Step 1 of 5 — login credentials</p>
         <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label">Profile Picture <span class="text-danger">*</span></label>
-            <input class="form-control" type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required>
-            <div class="muted" style="font-size:12px; margin-top:5px">
-              Upload a clear front-facing photo. This image will appear on your portal profile and certificates.
-            </div>
-            <div class="alert alert-warning mt-2" style="background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:10px; padding:10px; font-size:13px">
-              <i class="bi bi-exclamation-triangle-fill me-1"></i>
-              Upload a clear face photograph. Blurry, edited, cartoon, logo, group photos, or inappropriate images may result in rejection of your application.
-            </div>
-          </div>
+          <div class="col-12"><label class="form-label">Full name</label><input class="form-control" name="name" required></div>
+          <div class="col-md-7"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
+          <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
         </div>
         <div class="mt-4 d-flex justify-content-between">
           <a class="btn btn-ghost" href="<?= base_url('login.php') ?>"><i class="bi bi-arrow-left me-1"></i>Back to sign in</a>
@@ -134,25 +126,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 2: account credentials -->
+      <!-- Step 2: personal details -->
       <section class="wizard-pane d-none" data-step="2">
-        <h2 class="serif">Create your account</h2>
-        <p class="lead-muted">Step 2 of 5 — login credentials</p>
-        <div class="row g-3">
-          <div class="col-12"><label class="form-label">Full name</label><input class="form-control" name="name" required></div>
-          <div class="col-md-7"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
-          <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
-        </div>
-        <div class="mt-4 d-flex justify-content-between">
-          <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
-          <button type="button" class="btn btn-primary" data-next>Continue <i class="bi bi-arrow-right ms-1"></i></button>
-        </div>
-      </section>
-
-      <!-- Step 3: personal details -->
-      <section class="wizard-pane d-none" data-step="3">
         <h2 class="serif">Personal details</h2>
-        <p class="lead-muted">Step 3 of 5 — only the super admin will see these</p>
+        <p class="lead-muted">Step 2 of 5 — only the super admin will see these</p>
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label">Father name</label><input class="form-control" name="father_name"></div>
           <div class="col-md-6"><label class="form-label">CNIC #</label><input class="form-control" name="cnic" placeholder="35202-1234567-1"></div>
@@ -166,10 +143,27 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 4: academic information -->
-      <section class="wizard-pane d-none" data-step="4">
-        <h2 class="serif">Academic information</h2>
-        <p class="lead-muted">Step 4 of 5</p>
+      <!-- Step 3: Profile Picture (Mandatory) + Academic Information -->
+      <section class="wizard-pane d-none" data-step="3">
+        <h2 class="serif">Profile Picture & Academics</h2>
+        <p class="lead-muted">Step 3 of 5 — upload your photo and academic details</p>
+        
+        <!-- Avatar Upload Section -->
+        <div class="row g-3 mb-4">
+          <div class="col-12">
+            <label class="form-label">Profile Picture <span class="text-danger">*</span></label>
+            <input class="form-control" type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required>
+            <div class="muted" style="font-size:12px; margin-top:5px">
+              Upload a clear front-facing photo. This image will appear on your portal profile and certificates.
+            </div>
+            <div class="alert alert-warning mt-2" style="background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:10px; padding:10px; font-size:13px">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              Upload a clear face photograph. Blurry, edited, cartoon, logo, group photos, or inappropriate images may result in rejection of your application.
+            </div>
+          </div>
+        </div>
+        
+        <!-- Academic Section -->
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label">University</label><input class="form-control" name="university"></div>
           <div class="col-md-6"><label class="form-label">Degree / Program</label><input class="form-control" name="degree"></div>
@@ -177,16 +171,17 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           <div class="col-md-4"><label class="form-label">Semester</label><input class="form-control" name="semester" placeholder="7th"></div>
           <div class="col-md-4"><label class="form-label">Graduation year</label><input class="form-control" name="graduation_year" placeholder="2026"></div>
         </div>
+        
         <div class="mt-4 d-flex justify-content-between">
           <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
           <button type="button" class="btn btn-primary" data-next>Continue <i class="bi bi-arrow-right ms-1"></i></button>
         </div>
       </section>
 
-      <!-- Step 5: skills & links -->
-      <section class="wizard-pane d-none" data-step="5">
-        <h2 class="serif">Skills & links</h2>
-        <p class="lead-muted">Step 5 of 5 — tell us what you bring</p>
+      <!-- Step 4: Skills -->
+      <section class="wizard-pane d-none" data-step="4">
+        <h2 class="serif">Skills & Links</h2>
+        <p class="lead-muted">Step 4 of 5 — tell us what you bring</p>
         <div class="row g-3">
           <div class="col-12"><label class="form-label">Skills (comma separated)</label><input class="form-control" name="skills" placeholder="React, Node.js, MySQL"></div>
           <div class="col-md-4"><label class="form-label">GitHub URL</label><input class="form-control" name="github"></div>
@@ -194,6 +189,20 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           <div class="col-md-4"><label class="form-label">Portfolio URL</label><input class="form-control" name="portfolio"></div>
           <div class="col-12"><label class="form-label">Short bio</label><textarea class="form-control" name="bio" rows="3"></textarea></div>
           <div class="col-12 muted" style="font-size:12px"><i class="bi bi-shield-lock me-1"></i> Your personal & academic details are visible <b>only to the super admin</b>. Mentors and managers see only your name, email and team activity.</div>
+        </div>
+        <div class="mt-4 d-flex justify-content-between">
+          <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
+          <button type="button" class="btn btn-primary" data-next>Continue <i class="bi bi-arrow-right ms-1"></i></button>
+        </div>
+      </section>
+
+      <!-- Step 5: Review & Submit -->
+      <section class="wizard-pane d-none" data-step="5">
+        <h2 class="serif">Review & Submit</h2>
+        <p class="lead-muted">Step 5 of 5 — final review before submission</p>
+        <div class="alert alert-info" style="background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.3); border-radius:10px;">
+          <i class="bi bi-info-circle-fill me-1"></i>
+          Please review all your information before submitting. Your application will be reviewed by the super admin.
         </div>
         <div class="mt-4 d-flex justify-content-between">
           <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
