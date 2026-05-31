@@ -176,16 +176,16 @@ a:hover{color:var(--primary)}
 /* .app-footer{margin:24px -24px -24px;padding:12px 24px;border-top:1px solid var(--border);background:rgba(17,20,27,.6);color:var(--muted)} */
 
 /* ===== Signup wizard slide animation ===== */
-.wizard-form{position:relative;overflow:hidden}
+/* .wizard-form{position:relative;overflow:hidden}
 .wizard-pane.slide-in{animation:slideIn .42s cubic-bezier(.22,.61,.36,1) both}
 @keyframes slideIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
 .wizard-steps{display:flex;gap:6px;margin:0 0 18px}
 .wizard-steps .step{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.08);transition:background .25s}
 .wizard-steps .step.active{background:linear-gradient(90deg,var(--primary),var(--primary-glow))}
-.wizard-steps .step.done{background:var(--primary)}
+.wizard-steps .step.done{background:var(--primary)} */
 
 /* ===== Kanban Board ===== */
-.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+/* .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media (max-width:900px){.kanban{grid-template-columns:1fr}}
 .kanban-col{min-height:240px;display:flex;flex-direction:column}
 .kanban-col-head{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
@@ -194,7 +194,7 @@ a:hover{color:var(--primary)}
 .kanban-card:hover{border-color:rgba(212,168,76,.4);box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .kanban-card:active{cursor:grabbing}
 .kanban-ghost{opacity:.4;background:rgba(212,168,76,.08)!important;border-style:dashed!important}
-.kanban-meta{display:flex;flex-wrap:wrap;gap:6px}
+.kanban-meta{display:flex;flex-wrap:wrap;gap:6px} */
 
 /* Avatar image override (when actual photo present) */
-.user-chip img{box-shadow:0 2px 8px rgba(0,0,0,.4)}
+/* .user-chip img{box-shadow:0 2px 8px rgba(0,0,0,.4)} */
