@@ -6,19 +6,38 @@ $is_admin = $user['role']==='super_admin';
 
 if ($_SERVER['REQUEST_METHOD']==='POST' && $is_admin) {
   $a=$_POST['action']??''; $id=(int)($_POST['id']??0);
-  if ($a==='approve')   { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['active',$id]); flash('User approved.'); }
-  if ($a==='reject')    { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['rejected',$id]); flash('User rejected.'); }
-  if ($a==='deactivate'){ $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['inactive',$id]); flash('User deactivated.'); }
-  if ($a==='reactivate'){ $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['active',$id]); flash('User reactivated.'); }
-  if ($a==='role')      { $r=$_POST['role']; if(in_array($r,['super_admin','management','mentor','intern'],true)){ $pdo->prepare('UPDATE users SET role=? WHERE id=?')->execute([$r,$id]); flash('Role updated.'); } }
+  if ($a==='approve')    { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['active',$id]); flash('User approved.'); }
+  if ($a==='reject')     { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['rejected',$id]); flash('User rejected.'); }
+  if ($a==='deactivate') { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['inactive',$id]); flash('User deactivated.'); }
+  if ($a==='reactivate') { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['active',$id]); flash('User reactivated.'); }
+  if ($a==='delete' && $id !== (int)$user['id']) { $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$id]); flash('User deleted.'); }
+  if ($a==='role')       { $r=$_POST['role']; if(in_array($r,['super_admin','management','mentor','intern'],true)){ $pdo->prepare('UPDATE users SET role=? WHERE id=?')->execute([$r,$id]); flash('Role updated.'); } }
+  if ($a==='edit') {
+    $pdo->prepare('UPDATE users SET name=?, email=? WHERE id=?')
+        ->execute([trim($_POST['name']), trim($_POST['email']), $id]);
+    // upsert profile
+    $exists = $pdo->prepare('SELECT 1 FROM profiles WHERE user_id=?'); $exists->execute([$id]);
+    if ($exists->fetchColumn()) {
+      $pdo->prepare('UPDATE profiles SET phone=?, reg_number=?, university=?, cnic=?, semester=? WHERE user_id=?')
+          ->execute([$_POST['phone'],$_POST['reg_number'],$_POST['university'],$_POST['cnic'],$_POST['semester'],$id]);
+    } else {
+      $pdo->prepare('INSERT INTO profiles(user_id,phone,reg_number,university,cnic,semester) VALUES(?,?,?,?,?,?)')
+          ->execute([$id,$_POST['phone'],$_POST['reg_number'],$_POST['university'],$_POST['cnic'],$_POST['semester']]);
+    }
+    flash('User updated.');
+  }
   header('Location: '.base_url('admin/users.php')); exit;
 }
 
 $pending = $pdo->query("SELECT u.*, p.cnic, p.phone, p.reg_number, p.university FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status='pending' ORDER BY u.created_at DESC")->fetchAll();
-$all = $pdo->query("SELECT u.*, p.phone FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status!='pending' ORDER BY u.role,u.name")->fetchAll();
+$all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.semester FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status!='pending' ORDER BY u.role,u.name")->fetchAll();
 ?>
-<h1 class="serif" style="font-size:34px">Users & Approvals</h1>
-<p class="muted">Approve new signups, change roles, and manage account status.</p>
+<?php if ($m = flash()): ?><div class="alert alert-info"><?= e($m) ?></div><?php endif; ?>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <h1 class="serif m-0" style="font-size:34px">Users &amp; Approvals</h1>
+  <?php if($is_admin): ?><a href="<?= base_url('admin/import.php') ?>" class="btn btn-primary"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Bulk Import (CSV/Excel)</a><?php endif; ?>
+</div>
+<p class="muted">Approve new signups, change roles, edit, delete, and manage account status.</p>
 
 <?php if($is_admin): ?>
 <div class="glass card-pad mt-3">
@@ -47,7 +66,7 @@ $all = $pdo->query("SELECT u.*, p.phone FROM users u LEFT JOIN profiles p ON p.u
     <tbody>
     <?php foreach($all as $u): ?>
       <tr>
-        <td><b><?= e($u['name']) ?></b></td>
+        <td><b><?= e($u['name']) ?></b><?php if(!empty($u['reg_number'])): ?><div class="muted" style="font-size:11px"><?= e($u['reg_number']) ?></div><?php endif; ?></td>
         <td class="muted"><?= e($u['email']) ?></td>
         <td>
           <?php if($is_admin): ?>
@@ -62,11 +81,15 @@ $all = $pdo->query("SELECT u.*, p.phone FROM users u LEFT JOIN profiles p ON p.u
         </td>
         <td><span class="badge <?= $u['status']==='active'?'b-success':($u['status']==='rejected'?'b-danger':'b-muted') ?>"><?= e(ucfirst($u['status'])) ?></span></td>
         <?php if($is_admin): ?>
-        <td>
+        <td class="d-flex gap-1">
+          <button type="button" class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#editU<?= (int)$u['id'] ?>" title="Edit"><i class="bi bi-pencil"></i></button>
           <?php if($u['status']==='active'): ?>
-            <form method="post" style="display:inline"><input type="hidden" name="action" value="deactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-ghost btn-sm" title="Deactivate"><i class="bi bi-pause-circle"></i></button></form>
+            <form method="post"><input type="hidden" name="action" value="deactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-ghost btn-sm" title="Deactivate"><i class="bi bi-pause-circle"></i></button></form>
           <?php else: ?>
-            <form method="post" style="display:inline"><input type="hidden" name="action" value="reactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-ghost btn-sm" title="Reactivate"><i class="bi bi-play-circle"></i></button></form>
+            <form method="post"><input type="hidden" name="action" value="reactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-ghost btn-sm" title="Reactivate"><i class="bi bi-play-circle"></i></button></form>
+          <?php endif; ?>
+          <?php if ((int)$u['id'] !== (int)$user['id']): ?>
+          <form method="post" onsubmit="return confirm('Permanently delete <?= e($u['name']) ?>? This removes their profile, tasks and history.')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button></form>
           <?php endif; ?>
         </td>
         <?php endif; ?>
@@ -76,4 +99,26 @@ $all = $pdo->query("SELECT u.*, p.phone FROM users u LEFT JOIN profiles p ON p.u
   </table>
   </div>
 </div>
+
+<?php if($is_admin): foreach($all as $u): ?>
+<div class="modal fade" id="editU<?= (int)$u['id'] ?>" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content" style="background:#101216;color:#e6e6e6;border:1px solid var(--border)">
+      <input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+      <div class="modal-header"><h5 class="modal-title serif">Edit <?= e($u['name']) ?></h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body row g-2">
+        <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" name="name" value="<?= e($u['name']) ?>" required></div>
+        <div class="col-md-6"><label class="form-label">Email</label><input class="form-control" name="email" value="<?= e($u['email']) ?>" required></div>
+        <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" value="<?= e($u['phone']) ?>"></div>
+        <div class="col-md-6"><label class="form-label">Reg #</label><input class="form-control" name="reg_number" value="<?= e($u['reg_number']) ?>"></div>
+        <div class="col-md-6"><label class="form-label">University</label><input class="form-control" name="university" value="<?= e($u['university']) ?>"></div>
+        <div class="col-md-3"><label class="form-label">CNIC</label><input class="form-control" name="cnic" value="<?= e($u['cnic']) ?>"></div>
+        <div class="col-md-3"><label class="form-label">Semester</label><input class="form-control" name="semester" value="<?= e($u['semester']) ?>"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button></div>
+    </form>
+  </div>
+</div>
+<?php endforeach; endif; ?>
+
 <?php require __DIR__ . '/../includes/footer.php'; ?>

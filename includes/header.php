@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/migrate.php';
 require_login();
 $user = current_user();
 $page_title = $page_title ?? 'ProSensia Portal';
@@ -33,7 +34,7 @@ $page_label = $page_label ?? 'Overview';
         <div style="font-size:13px"><?= e($user['name']) ?></div>
         <div class="small-cap"><?= e(role_label($user['role'])) ?></div>
       </div>
-      <div class="avatar"><?= e(strtoupper(substr($user['name'],0,1))) ?></div>
+      <?= avatar_html($user, 36) ?>
       <a href="<?= base_url('logout.php') ?>" class="btn btn-ghost btn-sm" title="Sign out"><i class="bi bi-box-arrow-right"></i></a>
     </div>
   </div>

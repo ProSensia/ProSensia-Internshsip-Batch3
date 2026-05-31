@@ -1,60 +1,55 @@
-# ProSensia Internship Portal — PHP / MySQL / Bootstrap
+# ProSensia Internship Portal (PHP / MySQL)
 
-A full-stack PHP + MySQL portal for managing a coding internship cohort
-(Super Admin, Management, Mentor, Intern roles).
+> Founder / Director / CEO: **Momin Khan** · EasyPaisa: **0310-7717890**
 
-## What's new in this build
+## Deploy in 5 minutes
 
-- **ProSensia logo** wired into sidebar, topbar, login and signup (upload your own from Admin → Settings).
-- **Fully responsive** — sidebar collapses to a slide-in drawer on mobile/tablet, tables scroll, KPIs reflow.
-- **Form C → PDF download** (`intern/formc_pdf.php`) — generated with **FPDF** in the *Internship Placement Proforma* layout: student info, employer block, signature & stamp lines for Employer and HoD/Chairman, plus optional reflection page. Logo + partner logo (Pak-Austria) appear in the header automatically.
-- **Multi-step animated signup** (`signup.php`) — 4 steps (account → personal → academic → skills). New accounts land as **pending**; only the **super admin** can see full profiles and approve/reject from *Users & Approvals*.
-- **Attendance** (`shared/attendance.php`) — daily check-in / check-out / leave, 30-day history, mentor & management see today's roll.
-- **Materials** — mentors, management and super admin can publish lectures, PDFs and links, scoped to a team or to everyone.
-- **Role management** — super admin can change any user's role inline from the Users page.
-- **Subscriptions** — super admin can create / update / cancel plans per user; users see their own.
-- **Admin Settings** — upload ProSensia logo, upload partner logo (e.g. Pak-Austria), edit certificate batch & signatory.
-- **Schema upgrades** — `attendance`, `subscriptions`, `settings` tables + extended `profiles` (CNIC, reg #, father name, semester, address) + `materials.team_id` + `team_members.role_in_team` + `users.status` now includes `pending`/`rejected`.
+1. Copy the `webfomat/` folder into your web root (`htdocs/`, `public_html/`, etc.).
+2. Create a MySQL database and import `sql/schema.sql`.
+3. Edit `includes/connection.php` with your DB credentials.
+4. Make sure `assets/uploads/avatars/` is writable by PHP (chmod 775).
+5. Open `http://localhost/webfomat/login.php`.
 
-## Run it
+Demo accounts — all password `password123`:
 
-1. Copy the `webfomat/` folder into your web root (XAMPP `htdocs/`, MAMP, or cPanel `public_html/`).
-2. In phpMyAdmin, import `sql/schema.sql`.
-3. Edit `includes/connection.php` if your MySQL host/user/pass differ from `root` / no password.
-4. Browse to `http://localhost/webfomat/login.php`.
+| Role         | Email                       |
+|--------------|-----------------------------|
+| Super Admin  | momin@prosensia.com         |
+| Management   | manager@prosensia.com       |
+| Mentor       | mentor@prosensia.com        |
+| Intern       | intern@prosensia.com        |
 
-### Demo accounts (password: `password123`)
+## What's new in this build (Phase 1)
 
-| Role          | Email                       |
-| ------------- | --------------------------- |
-| Super Admin   | admin@prosensia.com         |
-| Management    | manager@prosensia.com       |
-| Mentor        | mentor@prosensia.com        |
-| Intern        | intern@prosensia.com        |
-| Intern (2nd)  | ali@prosensia.com           |
-| **Pending**   | zara@prosensia.com (test approval flow) |
+- **Jira-style Kanban board** — personal board (`intern/board.php`) and per-team board (`shared/team_board.php`) with drag-and-drop between **To Do / In Progress / Done** (SortableJS).
+- **Day-wise version control** — "Save daily report" snapshots each day into `kanban_snapshots` (one row per user per day).
+- **Field-based teams** — schema seeded with Cyber Security, AI & ML, Full Stack, Python, QA, Graphic Designing, C++.
+- **Profile images** — uploadable on `intern/profile.php`, stored under `assets/uploads/avatars/`, shown in topbar & user lists.
+- **Animated signup wizard** — 4-step slide animation on `signup.php`.
+- **Founder credit + EasyPaisa info** — footer on every page; super admin = Momin Khan.
+- **Favicon** — falls back to the ProSensia logo automatically if `fav_path` setting is empty.
+- **Form C PDF** — Pak-Austria proforma export via FPDF (`intern/formc_pdf.php`).
 
-## Folder layout
+## Coming in Phase 2 (noted from your answers)
+
+- Excel/CSV import of interns (columns: Name, Father's Name, University Registration #, Semester, Contact, Internship Field, Months Paid, Payment, CNIC) with BS Registration # as unique key.
+- Subscription tiers: 1 mo = PKR 1,000, 2 mo = 1,800, 3 mo = 2,500 + scholarship flag + EasyPaisa screenshot upload + super-admin approval.
+- Advanced chat with field-scoped channels.
+- Super-admin edit / delete users + role re-assign + bulk approval.
+
+## File map
 
 ```
 webfomat/
-├── admin/         Super-admin only (index, users, settings, security)
-├── management/    Management dashboard
-├── mentor/        Mentor hub + assign-task
-├── intern/        Intern workspace (enrollment, profile, tasks, assignments, formc, formc_pdf)
-├── shared/        Materials, Messages, Teams, Certificates, Attendance, Subscriptions
-├── includes/      auth, connection, header, footer, sidebar
-├── lib/           FPDF (PDF generation, no Composer required)
-├── assets/        css, img/prosensia-logo.png
-├── uploads/       admin-uploaded logos / partner brand
-├── sql/schema.sql Full schema + seed data
-├── login.php  signup.php  logout.php  index.php
-└── README.md
+├── admin/                 super-admin pages (users, settings, security)
+├── api/                   AJAX endpoints (board_update.php)
+├── assets/                CSS, images, uploads
+│   └── uploads/avatars/   user profile images (writable)
+├── includes/              auth, header, footer, sidebar, DB connection
+├── intern/                intern workspace (board, tasks, profile, formc…)
+├── lib/                   FPDF for PDF generation
+├── management/  mentor/   role landing pages
+├── shared/                team_board, materials, messages, attendance…
+├── sql/schema.sql         full DB schema + seed data
+└── login.php · signup.php · logout.php · index.php
 ```
-
-## Notes
-
-- The bundled ProSensia logo is a placeholder generated for this build — replace it any time from **Admin → Settings**.
-- The Pak-Austria (partner) logo slot is empty by default; upload from **Admin → Settings** and it appears in the Form C PDF header next to the ProSensia logo.
-- PDF generation uses **FPDF 1.8.6** (single-file, pure PHP) — no Composer, no `pdflib`, no system binaries required. Works on any shared host with PHP 7.4+.
-- All passwords are bcrypt-hashed (`password_hash`). Demo seed accounts also accept the literal `password123` for first-run convenience.

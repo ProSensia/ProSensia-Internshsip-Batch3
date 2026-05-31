@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
     <?php if ($err): ?><div class="alert alert-danger" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#fecaca;border-radius:10px;font-size:13px"><?= e($err) ?></div><?php endif; ?>
 
-    <form method="post" id="signupForm" novalidate>
+    <form method="post" id="signupForm" novalidate class="wizard-form">
       <!-- Step 1: account -->
       <section class="wizard-pane" data-step="1">
         <h2 class="serif">Create your account</h2>
@@ -138,9 +138,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   const panes=()=>document.querySelectorAll('[data-step]');
   const bars=()=>document.querySelectorAll('[data-bar]');
   function show(n){
-    panes().forEach(p=>{p.classList.toggle('d-none', Number(p.dataset.step)!==n)});
+    panes().forEach(p=>{
+      const active = Number(p.dataset.step)===n;
+      p.classList.toggle('d-none', !active);
+      if (active) { p.classList.remove('slide-in'); void p.offsetWidth; p.classList.add('slide-in'); }
+    });
     bars().forEach(b=>{const k=Number(b.dataset.bar);b.classList.toggle('done',k<n);b.classList.toggle('active',k===n)});
-    cur=n; window.scrollTo({top:0,behavior:'smooth'});
+    cur=n;
+    const wiz=document.querySelector('.wizard');
+    if (wiz) wiz.scrollIntoView({behavior:'smooth', block:'start'});
   }
   document.querySelectorAll('[data-next]').forEach(b=>b.addEventListener('click',()=>{
     const pane=document.querySelector('[data-step="'+cur+'"]');

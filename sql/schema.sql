@@ -9,6 +9,8 @@ DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS attendance;
 DROP TABLE IF EXISTS subscriptions;
 DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS kanban_snapshots;
+DROP TABLE IF EXISTS kanban_cards;
 DROP TABLE IF EXISTS team_members;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS certificate_requests;
@@ -43,6 +45,7 @@ CREATE TABLE profiles (
   university VARCHAR(160), degree VARCHAR(120), graduation_year VARCHAR(8),
   skills TEXT, github VARCHAR(200), linkedin VARCHAR(200), portfolio VARCHAR(200),
   bio TEXT, avatar_color VARCHAR(20) DEFAULT '#d4a84c',
+  avatar_path VARCHAR(255) DEFAULT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
@@ -130,6 +133,39 @@ CREATE TABLE team_members (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Jira-style Kanban (personal + team boards)
+CREATE TABLE kanban_cards (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  owner_user_id INT NULL,
+  team_id INT NULL,
+  field VARCHAR(60) NULL,
+  title VARCHAR(200) NOT NULL,
+  description TEXT,
+  status ENUM('todo','in_progress','done') DEFAULT 'todo',
+  position INT DEFAULT 0,
+  due_date DATE NULL,
+  created_by INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX(owner_user_id), INDEX(team_id), INDEX(status),
+  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE kanban_snapshots (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  snapshot_date DATE NOT NULL,
+  todo_count INT DEFAULT 0,
+  inprogress_count INT DEFAULT 0,
+  done_count INT DEFAULT 0,
+  payload TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_user_day(user_id, snapshot_date),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE chat_messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   channel_key VARCHAR(120) NOT NULL,
@@ -168,9 +204,14 @@ CREATE TABLE subscriptions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   plan VARCHAR(60) DEFAULT 'standard',
+  months INT DEFAULT 1,
   amount DECIMAL(10,2) DEFAULT 0,
-  status ENUM('active','paused','cancelled','trial') DEFAULT 'active',
+  status ENUM('pending_review','active','paused','cancelled','trial','rejected') DEFAULT 'pending_review',
   starts_on DATE, ends_on DATE,
+  payment_ref VARCHAR(80) DEFAULT NULL,
+  proof_path VARCHAR(255) DEFAULT NULL,
+  reviewer_note VARCHAR(255) DEFAULT NULL,
+  scholarship TINYINT(1) DEFAULT 0,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
@@ -184,7 +225,7 @@ CREATE TABLE settings (
 -- SEED DATA  (password for all = "password123")
 -- =========================
 INSERT INTO users (id,name,email,password,role,status) VALUES
- (1,'Aisha Khan','admin@prosensia.com','$2b$10$RmiZPAMqDKLLL0hohWMzl.Ub1pL0c9ZUCQxscrkOugohB0AcxqQcS','super_admin','active'),
+ (1,'Momin Khan','momin@prosensia.com','$2b$10$RmiZPAMqDKLLL0hohWMzl.Ub1pL0c9ZUCQxscrkOugohB0AcxqQcS','super_admin','active'),
  (2,'Bilal Ahmed','manager@prosensia.com','$2b$10$RmiZPAMqDKLLL0hohWMzl.Ub1pL0c9ZUCQxscrkOugohB0AcxqQcS','management','active'),
  (3,'Sara Iqbal','mentor@prosensia.com','$2b$10$RmiZPAMqDKLLL0hohWMzl.Ub1pL0c9ZUCQxscrkOugohB0AcxqQcS','mentor','active'),
  (4,'Hamza Raza','intern@prosensia.com','$2b$10$RmiZPAMqDKLLL0hohWMzl.Ub1pL0c9ZUCQxscrkOugohB0AcxqQcS','intern','active'),
@@ -218,38 +259,56 @@ INSERT INTO assignments (user_id,title,week,due_date,description,github_url,stat
  (4,'Capstone Spec & Wireframes',5,DATE_ADD(CURDATE(),INTERVAL 11 DAY),'1-page spec + Figma.',NULL,'not_started',NULL,NULL);
 
 INSERT INTO teams (id,name,description,created_by) VALUES
- (1,'Capstone — Team A','E-commerce capstone group',3),
- (2,'Batch 3 — All Interns','Cohort-wide channel for Batch 3',2);
+ (1,'Cyber Security',          'Cybersecurity field team',3),
+ (2,'AI & Machine Learning',   'AI/ML field team',3),
+ (3,'Full Stack Development',  'Full-stack web team',3),
+ (4,'Python Development',      'Python team',3),
+ (5,'Software Testing / QA',   'QA / testing team',3),
+ (6,'Graphic Designing',       'Design team',3),
+ (7,'C++ Programming',         'Systems / C++ team',3);
 
 INSERT INTO team_members (team_id,user_id,role_in_team) VALUES
- (1,3,'lead'),(1,4,'member'),(1,2,'member'),
- (2,2,'lead'),(2,3,'member'),(2,4,'member'),(2,5,'member');
+ (3,3,'lead'),(3,4,'member'),(3,5,'member'),
+ (1,3,'lead'),(2,3,'lead');
 
 INSERT INTO chat_messages (channel_key,from_id,text) VALUES
- ('channel:announcements',1,'Welcome to Batch 3! Onboarding starts Monday at 5 PM.'),
+ ('channel:announcements',1,'Welcome to ProSensia! — Momin Khan'),
  ('channel:announcements',1,'Form C templates are now available under Workspace.'),
- ('team:1',3,'Standup tomorrow 5 PM. Bring blockers.'),
- ('team:1',4,'Pushed the auth module to main.'),
- ('dm:3|4',3,'Reviewed your latest commit — solid work.');
+ ('team:3',3,'Standup tomorrow 5 PM. Bring blockers.'),
+ ('team:3',4,'Pushed the auth module to main.');
 
 INSERT INTO materials (title,kind,url,module,meta,team_id,posted_by) VALUES
  ('HTML & CSS Fundamentals','pdf','#','Module 1','4.2 MB',NULL,1),
  ('Intro to JavaScript','video','#','Module 2','42 min',NULL,1),
  ('MDN Web Docs','link','https://developer.mozilla.org','Reference','external',NULL,1),
- ('React Crash Course','video','#','Module 3','1h 12m',1,3),
- ('SQL Cheat Sheet','pdf','#','Module 4','1.1 MB',1,3);
+ ('React Crash Course','video','#','Module 3','1h 12m',3,3),
+ ('SQL Cheat Sheet','pdf','#','Module 4','1.1 MB',3,3);
 
 INSERT INTO attendance (user_id,marked_on,status,check_in,check_out) VALUES
  (4,CURDATE(),'present','09:05:00',NULL),
  (5,CURDATE(),'late','10:20:00',NULL),
  (4,DATE_SUB(CURDATE(),INTERVAL 1 DAY),'present','09:00:00','17:30:00');
 
-INSERT INTO subscriptions (user_id,plan,amount,status,starts_on,ends_on) VALUES
- (4,'Batch 3 — Monthly',25000,'active',CURDATE(),DATE_ADD(CURDATE(),INTERVAL 90 DAY)),
- (5,'Batch 3 — Full',60000,'active',CURDATE(),DATE_ADD(CURDATE(),INTERVAL 90 DAY));
+INSERT INTO subscriptions (user_id,plan,months,amount,status,starts_on,ends_on) VALUES
+ (4,'1 Month',1,1000,'active',CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY)),
+ (5,'2 Months',2,1800,'active',CURDATE(),DATE_ADD(CURDATE(),INTERVAL 60 DAY));
+
+-- Seed kanban cards for intern (4)
+INSERT INTO kanban_cards (owner_user_id,team_id,field,title,description,status,position,due_date,created_by) VALUES
+ (4,NULL,'Full Stack Development','Read REST API design patterns','Module 4 lecture',           'todo',        0, CURDATE(),                       3),
+ (4,NULL,'Full Stack Development','Implement CRUD endpoints',     'Express + MySQL',            'in_progress', 0, DATE_ADD(CURDATE(),INTERVAL 2 DAY),3),
+ (4,NULL,'Full Stack Development','Push auth module',             'JWT login + refresh',        'done',        0, DATE_SUB(CURDATE(),INTERVAL 1 DAY),3);
+
+-- Seed team-board cards for Full Stack team (team_id 3)
+INSERT INTO kanban_cards (owner_user_id,team_id,field,title,description,status,position,due_date,created_by) VALUES
+ (NULL,3,'Full Stack Development','Design DB schema','3NF normalised tables','todo',0,DATE_ADD(CURDATE(),INTERVAL 1 DAY),3),
+ (NULL,3,'Full Stack Development','Wire up CI','GitHub Actions','in_progress',0,DATE_ADD(CURDATE(),INTERVAL 3 DAY),3);
 
 INSERT INTO settings (k,v) VALUES
  ('logo_path','assets/img/prosensia-logo.png'),
+ ('fav_path',''),
  ('partner_logo_path',''),
  ('cert_batch','Batch 3 — Summer 2026'),
- ('cert_signatory','Aisha Khan, Director — ProSensia');
+ ('cert_signatory','Momin Khan, Founder / Director / CEO — ProSensia'),
+ ('founder_name','Momin Khan'),
+ ('easypaisa_number','03107717890');
