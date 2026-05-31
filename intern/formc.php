@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     $start_date    = $_POST['start_date'] ?? null;
     $end_date      = $_POST['end_date'] ?? null;
 
-    // Validate all employer fields are filled
+    // Validate all employer fields are required
     $errors = [];
     if (empty($employer_name)) $errors[] = 'Employer name is required.';
     if (empty($employer_dept)) $errors[] = 'Internship department is required.';
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
             $ins = $pdo->prepare('INSERT INTO form_c(user_id, employer_name, employer_dept, joining_date, start_date, end_date, status, submitted_at) VALUES(?,?,?,?,?,?,?,NOW())');
             $ins->execute([$uid, $employer_name, $employer_dept, $joining_date, $start_date, $end_date, 'submitted']);
         }
-        flash('Form C submitted successfully. Awaiting admin approval.');
+        flash('Form C submitted successfully. Awaiting admin approval.', 'success');
         header('Location: ' . base_url('intern/formc.php'));
         exit;
     } else {
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'revie
     $id     = (int)($_POST['id'] ?? 0);
     $pdo->prepare('UPDATE form_c SET status=?, reviewer_note=? WHERE id=?')
         ->execute([$status, $note, $id]);
-    flash('Form C ' . $status . '.');
+    flash('Form C ' . $status . '.', 'info');
     header('Location: ' . base_url('intern/formc.php'));
     exit;
 }
@@ -84,45 +84,18 @@ if ($role === 'intern') {
     <form method="post" class="glass card-pad mt-2">
         <input type="hidden" name="action" value="save">
 
-        <!-- Student Information (read-only, from profile) -->
+        <!-- Student Information (read-only) -->
         <h5 class="serif mb-3">Student Information</h5>
         <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label">Student Name</label>
-                <input class="form-control" value="<?= e($user['name']) ?>" readonly disabled>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Father Name</label>
-                <input class="form-control" value="<?= e($profile['father_name'] ?? '') ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Registration Number</label>
-                <input class="form-control" value="<?= e($profile['reg_number'] ?? '') ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Department</label>
-                <input class="form-control" value="<?= e($profile['department'] ?? 'Electrical and Computer Engineering') ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">CNIC #</label>
-                <input class="form-control" value="<?= e($profile['cnic'] ?? '') ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Contact Number</label>
-                <input class="form-control" value="<?= e($profile['phone'] ?? '') ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Email</label>
-                <input class="form-control" value="<?= e($user['email']) ?>" readonly disabled>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Internship Semester</label>
-                <input class="form-control" value="<?= e($profile['semester'] ?? '') ?>" readonly disabled>
-            </div>
-            <div class="col-12">
-                <label class="form-label">Present Address</label>
-                <textarea class="form-control" rows="2" readonly disabled><?= e($profile['address'] ?? '') ?></textarea>
-            </div>
+            <div class="col-md-6"><label class="form-label">Student Name</label><input class="form-control" value="<?= e($user['name']) ?>" readonly disabled></div>
+            <div class="col-md-6"><label class="form-label">Father Name</label><input class="form-control" value="<?= e($profile['father_name'] ?? '') ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">Registration Number</label><input class="form-control" value="<?= e($profile['reg_number'] ?? '') ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">Department</label><input class="form-control" value="<?= e($profile['department'] ?? 'Electrical and Computer Engineering') ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">CNIC #</label><input class="form-control" value="<?= e($profile['cnic'] ?? '') ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">Contact Number</label><input class="form-control" value="<?= e($profile['phone'] ?? '') ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">Email</label><input class="form-control" value="<?= e($user['email']) ?>" readonly disabled></div>
+            <div class="col-md-4"><label class="form-label">Internship Semester</label><input class="form-control" value="<?= e($profile['semester'] ?? '') ?>" readonly disabled></div>
+            <div class="col-12"><label class="form-label">Present Address</label><textarea class="form-control" rows="2" readonly disabled><?= e($profile['address'] ?? '') ?></textarea></div>
         </div>
 
         <hr class="my-4">
@@ -130,36 +103,17 @@ if ($role === 'intern') {
         <!-- Employer Section (editable, required) -->
         <h5 class="serif mb-3">To be filled by Internship Industry/Organization Representative</h5>
         <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label">Internship employer name <span class="text-danger">*</span></label>
-                <input class="form-control" name="employer_name" value="<?= e($f['employer_name'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Internship department <span class="text-danger">*</span></label>
-                <input class="form-control" name="employer_dept" value="<?= e($f['employer_dept'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Joining date <span class="text-danger">*</span></label>
-                <input class="form-control" type="date" name="joining_date" value="<?= e($f['joining_date'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Start date (internship period) <span class="text-danger">*</span></label>
-                <input class="form-control" type="date" name="start_date" value="<?= e($f['start_date'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">End date (internship period) <span class="text-danger">*</span></label>
-                <input class="form-control" type="date" name="end_date" value="<?= e($f['end_date'] ?? '') ?>" required>
-            </div>
+            <div class="col-md-6"><label class="form-label">Internship employer name <span class="text-danger">*</span></label><input class="form-control" name="employer_name" value="<?= e($f['employer_name'] ?? '') ?>" required></div>
+            <div class="col-md-6"><label class="form-label">Internship department <span class="text-danger">*</span></label><input class="form-control" name="employer_dept" value="<?= e($f['employer_dept'] ?? '') ?>" required></div>
+            <div class="col-md-4"><label class="form-label">Joining date <span class="text-danger">*</span></label><input class="form-control" type="date" name="joining_date" value="<?= e($f['joining_date'] ?? '') ?>" required></div>
+            <div class="col-md-4"><label class="form-label">Start date <span class="text-danger">*</span></label><input class="form-control" type="date" name="start_date" value="<?= e($f['start_date'] ?? '') ?>" required></div>
+            <div class="col-md-4"><label class="form-label">End date <span class="text-danger">*</span></label><input class="form-control" type="date" name="end_date" value="<?= e($f['end_date'] ?? '') ?>" required></div>
         </div>
 
         <div class="mt-4">
-            <button class="btn btn-primary" <?= ($status === 'approved' || $status === 'submitted') ? 'disabled' : '' ?>>
-                <i class="bi bi-send me-1"></i> Submit Form C
-            </button>
+            <button class="btn btn-primary" <?= ($status === 'approved' || $status === 'submitted') ? 'disabled' : '' ?>><i class="bi bi-send me-1"></i> Submit Form C</button>
             <?php if ($status !== 'draft'): ?>
-                <span class="badge align-self-center ms-2 <?= $status === 'approved' ? 'b-success' : ($status === 'rejected' ? 'b-danger' : 'b-warning') ?>">
-                    <?= ucfirst($status) ?>
-                </span>
+                <span class="badge align-self-center ms-2 <?= $status === 'approved' ? 'b-success' : ($status === 'rejected' ? 'b-danger' : 'b-warning') ?>"><?= ucfirst($status) ?></span>
             <?php endif; ?>
         </div>
         <?php if (!empty($f['reviewer_note'])): ?>
@@ -192,28 +146,13 @@ if ($role === 'intern') {
                             Employer: <?= e($f['employer_name'] ?: '—') ?> · <?= e($f['joining_date'] ?? '—') ?> · <?= e($f['start_date'] ?? '') ?> → <?= e($f['end_date'] ?? '') ?>
                         </div>
                     </div>
-                    <span class="badge align-self-start <?= $f['status'] === 'approved' ? 'b-success' : ($f['status'] === 'rejected' ? 'b-danger' : 'b-warning') ?>">
-                        <?= ucfirst($f['status']) ?>
-                    </span>
+                    <span class="badge align-self-start <?= $f['status'] === 'approved' ? 'b-success' : ($f['status'] === 'rejected' ? 'b-danger' : 'b-warning') ?>"><?= ucfirst($f['status']) ?></span>
                 </div>
                 <form method="post" class="row g-2 align-items-end mt-2">
-                    <input type="hidden" name="action" value="review">
-                    <input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
-                    <div class="col-md-3">
-                        <select class="form-select form-select-sm" name="status">
-                            <option value="approved" <?= $f['status'] === 'approved' ? 'selected' : '' ?>>Approve</option>
-                            <option value="rejected" <?= $f['status'] === 'rejected' ? 'selected' : '' ?>>Reject</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <input class="form-control form-control-sm" name="note" placeholder="Optional reviewer note" value="<?= e($f['reviewer_note'] ?? '') ?>">
-                    </div>
-                    <div class="col-md-3 d-flex gap-2">
-                        <button class="btn btn-sm btn-primary flex-grow-1">Submit decision</button>
-                        <a class="btn btn-sm btn-outline-light" href="<?= base_url('intern/formc_pdf.php?uid=' . (int)$f['user_id']) ?>" target="_blank">
-                            <i class="bi bi-file-earmark-pdf"></i>
-                        </a>
-                    </div>
+                    <input type="hidden" name="action" value="review"><input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
+                    <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="approved" <?= $f['status'] === 'approved' ? 'selected' : '' ?>>Approve</option><option value="rejected" <?= $f['status'] === 'rejected' ? 'selected' : '' ?>>Reject</option></select></div>
+                    <div class="col-md-6"><input class="form-control form-control-sm" name="note" placeholder="Optional reviewer note" value="<?= e($f['reviewer_note'] ?? '') ?>"></div>
+                    <div class="col-md-3 d-flex gap-2"><button class="btn btn-sm btn-primary flex-grow-1">Submit decision</button><a class="btn btn-sm btn-outline-light" href="<?= base_url('intern/formc_pdf.php?uid=' . (int)$f['user_id']) ?>" target="_blank"><i class="bi bi-file-earmark-pdf"></i></a></div>
                 </form>
             </div>
         <?php endforeach; ?>
