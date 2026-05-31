@@ -1,5 +1,5 @@
 <?php
-// signup.php — animated multi-step registration.
+// signup.php — animated multi-step registration with mandatory avatar upload.
 // Data is captured into pending users (status='pending'); only super_admin can view full profile.
 require_once __DIR__ . '/includes/auth.php';
 if (current_user()) { header('Location: '.role_home(current_user()['role'])); exit; }
@@ -14,17 +14,65 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $skills=trim($_POST['skills']??''); $bio=trim($_POST['bio']??'');
   $gh=trim($_POST['github']??''); $li=trim($_POST['linkedin']??''); $pf=trim($_POST['portfolio']??'');
 
-  if (!$name||!$email||strlen($pass)<6) { $err='Name, email, and a password (6+ chars) are required.'; }
-  else {
+  // Validate avatar is present and uploaded correctly
+  if (empty($_FILES['avatar']['name']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+    $err = 'Profile picture is required. Please upload a clear front-facing photo.';
+  } elseif (!$name||!$email||strlen($pass)<6) {
+    $err = 'Name, email, and a password (6+ chars) are required.';
+  } else {
     $s=$pdo->prepare('SELECT id FROM users WHERE email=?'); $s->execute([$email]);
-    if ($s->fetch()) { $err='An account with that email already exists.'; }
-    else {
-      $hash = password_hash($pass, PASSWORD_BCRYPT);
-      $pdo->prepare('INSERT INTO users(name,email,password,role,status) VALUES(?,?,?,?,?)')
-        ->execute([$name,$email,$hash,'intern','pending']);
-      $uid = (int)$pdo->lastInsertId();
-      $pdo->prepare('INSERT INTO profiles(user_id,father_name,cnic,reg_number,semester,phone,city,address,university,degree,graduation_year,skills,github,linkedin,portfolio,bio) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$uid,$father,$cnic,$reg,$sem,$phone,$city,$addr,$uni,$deg,$grad,$skills,$gh,$li,$pf,$bio]);
+    if ($s->fetch()) { $err = 'An account with that email already exists.'; }
+  }
+
+  // Proceed only if no errors so far
+  if (empty($err)) {
+    $hash = password_hash($pass, PASSWORD_BCRYPT);
+    $pdo->prepare('INSERT INTO users(name,email,password,role,status) VALUES(?,?,?,?,?)')
+      ->execute([$name,$email,$hash,'intern','pending']);
+    $uid = (int)$pdo->lastInsertId();
+
+    // --- Avatar Upload Processing ---
+    $avatarPath = null;
+    $info = @getimagesize($_FILES['avatar']['tmp_name']);
+    $allowed = [
+      IMAGETYPE_JPEG => 'jpg',
+      IMAGETYPE_PNG  => 'png',
+      IMAGETYPE_WEBP => 'webp',
+      IMAGETYPE_GIF  => 'gif'
+    ];
+
+    if ($info && isset($allowed[$info[2]])) {
+      $ext = $allowed[$info[2]];
+      $dir = __DIR__ . '/assets/uploads/avatars';
+      if (!is_dir($dir)) {
+        mkdir($dir, 0775, true);
+      }
+      $fname = 'u'.$uid.'-'.bin2hex(random_bytes(4)).'.'.$ext;
+      if (move_uploaded_file($_FILES['avatar']['tmp_name'], $dir.'/'.$fname)) {
+        $avatarPath = 'assets/uploads/avatars/'.$fname;
+      } else {
+        // If upload fails, delete the user we just created to keep data clean
+        $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);
+        $err = 'Failed to upload profile picture. Please try again.';
+      }
+    } else {
+      // Invalid file type
+      $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);
+      $err = 'Invalid image format. Please upload JPG, PNG, WEBP, or GIF.';
+    }
+
+    // Insert profile only if avatar upload succeeded
+    if (empty($err) && $avatarPath) {
+      $pdo->prepare('INSERT INTO profiles(
+        user_id, avatar_path, father_name, cnic, reg_number, semester, phone,
+        city, address, university, degree, graduation_year, skills,
+        github, linkedin, portfolio, bio
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([
+          $uid, $avatarPath, $father, $cnic, $reg, $sem, $phone,
+          $city, $addr, $uni, $deg, $grad, $skills,
+          $gh, $li, $pf, $bio
+        ]);
       $ok = true;
     }
   }
@@ -57,19 +105,28 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       <div class="step" data-bar="2"></div>
       <div class="step" data-bar="3"></div>
       <div class="step" data-bar="4"></div>
+      <div class="step" data-bar="5"></div>
     </div>
 
     <?php if ($err): ?><div class="alert alert-danger" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#fecaca;border-radius:10px;font-size:13px"><?= e($err) ?></div><?php endif; ?>
 
-    <form method="post" id="signupForm" novalidate class="wizard-form">
-      <!-- Step 1: account -->
+    <form method="post" enctype="multipart/form-data" id="signupForm" novalidate class="wizard-form">
+      <!-- Step 1: Profile Picture (Mandatory) -->
       <section class="wizard-pane" data-step="1">
-        <h2 class="serif">Create your account</h2>
-        <p class="lead-muted">Step 1 of 4 — login credentials</p>
+        <h2 class="serif">Profile picture</h2>
+        <p class="lead-muted">Step 1 of 5 — upload a clear face photo</p>
         <div class="row g-3">
-          <div class="col-12"><label class="form-label">Full name</label><input class="form-control" name="name" required></div>
-          <div class="col-md-7"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
-          <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
+          <div class="col-12">
+            <label class="form-label">Profile Picture <span class="text-danger">*</span></label>
+            <input class="form-control" type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required>
+            <div class="muted" style="font-size:12px; margin-top:5px">
+              Upload a clear front-facing photo. This image will appear on your portal profile and certificates.
+            </div>
+            <div class="alert alert-warning mt-2" style="background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:10px; padding:10px; font-size:13px">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              Upload a clear face photograph. Blurry, edited, cartoon, logo, group photos, or inappropriate images may result in rejection of your application.
+            </div>
+          </div>
         </div>
         <div class="mt-4 d-flex justify-content-between">
           <a class="btn btn-ghost" href="<?= base_url('login.php') ?>"><i class="bi bi-arrow-left me-1"></i>Back to sign in</a>
@@ -77,10 +134,25 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 2: personal -->
+      <!-- Step 2: account credentials -->
       <section class="wizard-pane d-none" data-step="2">
+        <h2 class="serif">Create your account</h2>
+        <p class="lead-muted">Step 2 of 5 — login credentials</p>
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label">Full name</label><input class="form-control" name="name" required></div>
+          <div class="col-md-7"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
+          <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
+        </div>
+        <div class="mt-4 d-flex justify-content-between">
+          <button type="button" class="btn btn-ghost" data-prev><i class="bi bi-arrow-left me-1"></i>Back</button>
+          <button type="button" class="btn btn-primary" data-next>Continue <i class="bi bi-arrow-right ms-1"></i></button>
+        </div>
+      </section>
+
+      <!-- Step 3: personal details -->
+      <section class="wizard-pane d-none" data-step="3">
         <h2 class="serif">Personal details</h2>
-        <p class="lead-muted">Step 2 of 4 — only the super admin will see these</p>
+        <p class="lead-muted">Step 3 of 5 — only the super admin will see these</p>
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label">Father name</label><input class="form-control" name="father_name"></div>
           <div class="col-md-6"><label class="form-label">CNIC #</label><input class="form-control" name="cnic" placeholder="35202-1234567-1"></div>
@@ -94,10 +166,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 3: academic -->
-      <section class="wizard-pane d-none" data-step="3">
+      <!-- Step 4: academic information -->
+      <section class="wizard-pane d-none" data-step="4">
         <h2 class="serif">Academic information</h2>
-        <p class="lead-muted">Step 3 of 4</p>
+        <p class="lead-muted">Step 4 of 5</p>
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label">University</label><input class="form-control" name="university"></div>
           <div class="col-md-6"><label class="form-label">Degree / Program</label><input class="form-control" name="degree"></div>
@@ -111,10 +183,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         </div>
       </section>
 
-      <!-- Step 4: skills -->
-      <section class="wizard-pane d-none" data-step="4">
+      <!-- Step 5: skills & links -->
+      <section class="wizard-pane d-none" data-step="5">
         <h2 class="serif">Skills & links</h2>
-        <p class="lead-muted">Step 4 of 4 — tell us what you bring</p>
+        <p class="lead-muted">Step 5 of 5 — tell us what you bring</p>
         <div class="row g-3">
           <div class="col-12"><label class="form-label">Skills (comma separated)</label><input class="form-control" name="skills" placeholder="React, Node.js, MySQL"></div>
           <div class="col-md-4"><label class="form-label">GitHub URL</label><input class="form-control" name="github"></div>
@@ -134,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 </div>
 <script>
 (function(){
-  let cur=1; const total=4;
+  let cur=1; const total=5;
   const panes=()=>document.querySelectorAll('[data-step]');
   const bars=()=>document.querySelectorAll('[data-bar]');
   function show(n){
@@ -159,18 +231,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 document.getElementById('signupForm').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
-
         if (cur < total) {
             const pane = document.querySelector('[data-step="' + cur + '"]');
             const req = pane.querySelectorAll('[required]');
-
             for (const f of req) {
                 if (!f.checkValidity()) {
                     f.reportValidity();
                     return;
                 }
             }
-
             show(cur + 1);
         } else {
             this.submit();
