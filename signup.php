@@ -156,5 +156,26 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   }));
   document.querySelectorAll('[data-prev]').forEach(b=>b.addEventListener('click',()=>{ if(cur>1) show(cur-1); }));
 })();
+document.getElementById('signupForm').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+
+        if (cur < total) {
+            const pane = document.querySelector('[data-step="' + cur + '"]');
+            const req = pane.querySelectorAll('[required]');
+
+            for (const f of req) {
+                if (!f.checkValidity()) {
+                    f.reportValidity();
+                    return;
+                }
+            }
+
+            show(cur + 1);
+        } else {
+            this.submit();
+        }
+    }
+});
 </script>
 </body></html>
