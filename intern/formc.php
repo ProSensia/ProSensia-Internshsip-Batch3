@@ -1,0 +1,89 @@
+<?php
+$page_title='Form C'; $page_section='Workspace'; $page_label='Form C';
+require __DIR__ . '/../includes/header.php';
+require_role(['intern','super_admin','management']);
+
+$uid = $user['id']; $role = $user['role'];
+
+if ($_SERVER['REQUEST_METHOD']==='POST') {
+    if (($_POST['action'] ?? '')==='save' && $role==='intern') {
+        $exists = $pdo->prepare('SELECT id FROM form_c WHERE user_id=?'); $exists->execute([$uid]);
+        if ($exists->fetch()) {
+            $pdo->prepare('UPDATE form_c SET supervisor_name=?,supervisor_email=?,organization=?,start_date=?,end_date=?,total_hours=?,responsibilities=?,skills_learned=?,challenges=?,feedback=?,rating=?,status=?,submitted_at=NOW() WHERE user_id=?')
+                ->execute([$_POST['supervisor_name'],$_POST['supervisor_email'],$_POST['organization'],$_POST['start_date'],$_POST['end_date'],$_POST['total_hours'],$_POST['responsibilities'],$_POST['skills_learned'],$_POST['challenges'],$_POST['feedback'],(int)$_POST['rating'],'submitted',$uid]);
+        } else {
+            $pdo->prepare('INSERT INTO form_c(user_id,supervisor_name,supervisor_email,organization,start_date,end_date,total_hours,responsibilities,skills_learned,challenges,feedback,rating,status,submitted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())')
+                ->execute([$uid,$_POST['supervisor_name'],$_POST['supervisor_email'],$_POST['organization'],$_POST['start_date'],$_POST['end_date'],$_POST['total_hours'],$_POST['responsibilities'],$_POST['skills_learned'],$_POST['challenges'],$_POST['feedback'],(int)$_POST['rating'],'submitted']);
+        }
+        flash('Form C submitted.');
+        header('Location: '.base_url('intern/formc.php')); exit;
+    }
+    if (($_POST['action'] ?? '')==='review' && in_array($role,['super_admin','management'],true)) {
+        $pdo->prepare('UPDATE form_c SET status=?, reviewer_note=? WHERE id=?')
+            ->execute([$_POST['status'],$_POST['note'],(int)$_POST['id']]);
+        flash('Form C '.$_POST['status'].'.');
+        header('Location: '.base_url('intern/formc.php')); exit;
+    }
+}
+
+if ($role==='intern') {
+    $q = $pdo->prepare('SELECT * FROM form_c WHERE user_id=?'); $q->execute([$uid]); $f = $q->fetch() ?: [];
+    ?>
+    <h1 class="serif" style="font-size:38px">Form C — Internship Completion</h1>
+    <p class="muted">Submit your final reflection so admin can approve your certificate.</p>
+    <?php if (($f['status'] ?? '')==='approved'): ?>
+      <div class="glass card-pad" style="border-color:rgba(52,211,153,.4)"><h4 class="serif">Approved ✓</h4><p class="muted mb-0">Your Form C has been approved. You can now request your certificate.</p></div>
+    <?php endif; ?>
+
+    <form method="post" class="glass card-pad mt-3">
+      <input type="hidden" name="action" value="save">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Supervisor name</label><input class="form-control" name="supervisor_name" value="<?= e($f['supervisor_name'] ?? '') ?>"></div>
+        <div class="col-md-6"><label class="form-label">Supervisor email</label><input class="form-control" name="supervisor_email" type="email" value="<?= e($f['supervisor_email'] ?? '') ?>"></div>
+        <div class="col-md-6"><label class="form-label">Organization</label><input class="form-control" name="organization" value="<?= e($f['organization'] ?? 'ProSensia') ?>"></div>
+        <div class="col-md-2"><label class="form-label">Total hours</label><input class="form-control" name="total_hours" value="<?= e($f['total_hours'] ?? '') ?>"></div>
+        <div class="col-md-2"><label class="form-label">Start</label><input class="form-control" type="date" name="start_date" value="<?= e($f['start_date'] ?? '') ?>"></div>
+        <div class="col-md-2"><label class="form-label">End</label><input class="form-control" type="date" name="end_date" value="<?= e($f['end_date'] ?? '') ?>"></div>
+        <div class="col-12"><label class="form-label">Key responsibilities</label><textarea class="form-control" name="responsibilities" rows="3"><?= e($f['responsibilities'] ?? '') ?></textarea></div>
+        <div class="col-md-6"><label class="form-label">Skills learned</label><textarea class="form-control" name="skills_learned" rows="3"><?= e($f['skills_learned'] ?? '') ?></textarea></div>
+        <div class="col-md-6"><label class="form-label">Challenges</label><textarea class="form-control" name="challenges" rows="3"><?= e($f['challenges'] ?? '') ?></textarea></div>
+        <div class="col-12"><label class="form-label">Overall feedback</label><textarea class="form-control" name="feedback" rows="3"><?= e($f['feedback'] ?? '') ?></textarea></div>
+        <div class="col-md-3"><label class="form-label">Self-rating</label>
+          <select class="form-select" name="rating">
+            <?php for($i=1;$i<=5;$i++): ?><option value="<?= $i ?>" <?= (int)($f['rating'] ?? 0)===$i?'selected':'' ?>><?= str_repeat('★',$i) ?> (<?= $i ?>)</option><?php endfor; ?>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4"><button class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit Form C</button>
+      <?php if (!empty($f['status'])): ?><span class="ms-3 badge <?= $f['status']==='approved'?'b-success':($f['status']==='rejected'?'b-danger':'b-warning') ?>"><?= e(ucfirst($f['status'])) ?></span><?php endif; ?></div>
+      <?php if (!empty($f['reviewer_note'])): ?><div class="muted mt-3"><b>Reviewer note:</b> <?= e($f['reviewer_note']) ?></div><?php endif; ?>
+    </form>
+<?php } else {
+    $rows = $pdo->query('SELECT f.*, u.name FROM form_c f JOIN users u ON u.id=f.user_id ORDER BY f.submitted_at DESC')->fetchAll();
+?>
+<h1 class="serif" style="font-size:38px">Form C — Review Inbox</h1>
+<p class="muted">Review and approve intern Form C submissions.</p>
+
+<div class="glass card-pad">
+<?php if (!$rows): ?><p class="muted">No Form C submissions yet.</p><?php endif; ?>
+<?php foreach($rows as $f): ?>
+  <div class="py-3" style="border-top:1px solid var(--border)">
+    <div class="d-flex justify-content-between">
+      <div>
+        <h5 class="serif m-0"><?= e($f['name']) ?> · <?= e($f['organization']) ?></h5>
+        <div class="muted" style="font-size:12px"><?= e($f['start_date']) ?> → <?= e($f['end_date']) ?> · <?= e($f['total_hours']) ?> hrs · <?= str_repeat('★',(int)$f['rating']) ?></div>
+      </div>
+      <span class="badge <?= $f['status']==='approved'?'b-success':($f['status']==='rejected'?'b-danger':'b-warning') ?>"><?= e(ucfirst($f['status'])) ?></span>
+    </div>
+    <p class="mt-2 muted" style="font-size:14px"><b>Responsibilities:</b> <?= e($f['responsibilities']) ?></p>
+    <p class="muted" style="font-size:14px"><b>Skills:</b> <?= e($f['skills_learned']) ?></p>
+    <form method="post" class="row g-2 align-items-end">
+      <input type="hidden" name="action" value="review"><input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
+      <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="approved">Approve</option><option value="rejected">Reject</option></select></div>
+      <div class="col-md-6"><input class="form-control form-control-sm" name="note" placeholder="Optional reviewer note" value="<?= e($f['reviewer_note'] ?? '') ?>"></div>
+      <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Submit decision</button></div>
+    </form>
+  </div>
+<?php endforeach; ?>
+</div>
+<?php } require __DIR__ . '/../includes/footer.php'; ?>
