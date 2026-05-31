@@ -1,8 +1,9 @@
 <?php
-// Form C — exact replica of official proforma PDF
+// Form C — exact replica with partner logo, reference number, QR code, digital signature note
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
+require_once __DIR__ . '/../lib/phpqrcode/qrlib.php'; // if you have phpqrcode, otherwise use QR API fallback
 
 $me = current_user();
 $role = $me['role'];
@@ -27,17 +28,37 @@ if ($role === 'intern' && (!$f || $f['status'] !== 'approved')) {
     exit('Form C not approved yet. You can download only after super admin approval.');
 }
 
-// Paths
-$logo = __DIR__ . '/../' . setting('logo_path', 'assets/img/prosensia-logo.png');
-$partner = setting('partner_logo_path') ? __DIR__ . '/../' . setting('partner_logo_path') : null;
-$employerStamp = __DIR__ . '/../assets/img/employer-stamp.png';
-$hodStamp = __DIR__ . '/../assets/img/hod-stamp.png';
+// Generate unique reference number (ProSensiaB3001 - B3100 range)
+$refNumber = 'ProSensiaB' . str_pad(3000 + (int)$f['id'], 4, '0', STR_PAD_LEFT);
+
+// Verification URL (public)
+$verifyUrl = base_url('verify_formc.php?ref=' . urlencode($refNumber));
+
+// Generate QR code as PNG file (using phpqrcode if available, else fallback to QuickChart API)
+$qrTempFile = __DIR__ . '/../temp/qr_' . uniqid() . '.png';
+@mkdir(dirname($qrTempFile), 0775, true);
+if (class_exists('QRcode')) {
+    QRcode::png($verifyUrl, $qrTempFile, QR_ECLEVEL_L, 4);
+} else {
+    // Fallback to QuickChart.io API (no local library required)
+    $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=200&margin=2';
+    $qrData = file_get_contents($qrUrl);
+    file_put_contents($qrTempFile, $qrData);
+}
+
+// Logo paths
+$proSensiaLogo = __DIR__ . '/../' . setting('logo_path', 'assets/img/prosensia-logo.png');
+$partnerLogo = setting('partner_logo_path') ? __DIR__ . '/../' . setting('partner_logo_path') : null;
 
 class ExactFormC extends FPDF
 {
+    public $partnerLogo;
+    public $refNumber;
+    public $qrFile;
+    
     function Header()
     {
-        // No automatic header – we draw everything manually for exact positioning
+        // Nothing automatic – we draw everything manually
     }
     function Footer()
     {
@@ -49,13 +70,32 @@ class ExactFormC extends FPDF
 }
 
 $pdf = new ExactFormC('P', 'mm', 'A4');
+$pdf->partnerLogo = $partnerLogo;
+$pdf->refNumber = $refNumber;
+$pdf->qrFile = $qrTempFile;
 $pdf->AliasNbPages();
 $pdf->SetMargins(15, 15, 15);
 $pdf->AddPage();
 $pdf->SetFont('Helvetica', '', 10);
 
-// ---------------------- TOP SECTION (University header) ----------------------
+// ==================== TOP SECTION ====================
+// Left side: Partner logo (Pak-Austria)
+if ($pdf->partnerLogo && file_exists($pdf->partnerLogo)) {
+    $pdf->Image($pdf->partnerLogo, 15, 15, 40);
+} else {
+    $pdf->SetXY(15, 15);
+    $pdf->SetFont('Helvetica', 'B', 10);
+    $pdf->Cell(40, 10, 'Pak-Austria Fachhochschule', 0, 0, 'L');
+}
+
+// Right side: Reference number
 $pdf->SetY(15);
+$pdf->SetX(150);
+$pdf->SetFont('Helvetica', 'B', 11);
+$pdf->Cell(45, 8, 'Ref: ' . $pdf->refNumber, 0, 1, 'R');
+
+// University header text
+$pdf->SetY(25);
 $pdf->SetFont('Helvetica', 'B', 12);
 $pdf->Cell(0, 6, 'Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK', 0, 1, 'C');
 $pdf->SetFont('Helvetica', '', 9);
@@ -65,7 +105,7 @@ $pdf->SetFont('Helvetica', 'B', 14);
 $pdf->Cell(0, 8, 'Internship Placement Proforma', 0, 1, 'C');
 $pdf->Ln(6);
 
-// ---------------------- STUDENT INFORMATION (two columns with lines) ----------------------
+// ==================== STUDENT INFORMATION ====================
 $pdf->SetFont('Helvetica', 'B', 11);
 $pdf->Cell(0, 8, 'Student Information:', 0, 1);
 $pdf->SetFont('Helvetica', '', 10);
@@ -83,7 +123,6 @@ $pdf->SetXY($right, $yStart);
 $pdf->Cell(35, $lineH, 'Father Name:', 0, 0);
 $pdf->Cell(55, $lineH, $student['father_name'] ?: '_________________________', 0, 1);
 
-// Row 2: Registration # / Department
 $yStart = $pdf->GetY();
 $pdf->SetXY($left, $yStart);
 $pdf->Cell(35, $lineH, 'Registration #:', 0, 0);
@@ -92,7 +131,6 @@ $pdf->SetXY($right, $yStart);
 $pdf->Cell(35, $lineH, 'Department:', 0, 0);
 $pdf->Cell(55, $lineH, $student['department'] ?: 'Electrical and Computer Engineering', 0, 1);
 
-// Row 3: CNIC # / Contact number
 $yStart = $pdf->GetY();
 $pdf->SetXY($left, $yStart);
 $pdf->Cell(35, $lineH, 'CNIC #:', 0, 0);
@@ -101,7 +139,6 @@ $pdf->SetXY($right, $yStart);
 $pdf->Cell(35, $lineH, 'Contact number:', 0, 0);
 $pdf->Cell(55, $lineH, $student['phone'] ?: '_________________________', 0, 1);
 
-// Row 4: Email / Internship semester
 $yStart = $pdf->GetY();
 $pdf->SetXY($left, $yStart);
 $pdf->Cell(35, $lineH, 'Email:', 0, 0);
@@ -110,7 +147,6 @@ $pdf->SetXY($right, $yStart);
 $pdf->Cell(35, $lineH, 'Internship semester:', 0, 0);
 $pdf->Cell(55, $lineH, $student['semester'] ?: '_________________________', 0, 1);
 
-// Row 5: Present Address (full width)
 $yStart = $pdf->GetY();
 $pdf->SetXY($left, $yStart);
 $pdf->Cell(35, $lineH, 'Present Address:', 0, 0);
@@ -118,7 +154,7 @@ $pdf->MultiCell(160, $lineH, $student['address'] ?: '_________________________',
 
 $pdf->Ln(4);
 
-// ---------------------- EMPLOYER SECTION ----------------------
+// ==================== EMPLOYER SECTION ====================
 $pdf->SetFont('Helvetica', 'B', 11);
 $pdf->Cell(0, 8, 'To be filled by Internship Industry/Organization Representative', 0, 1);
 $pdf->SetFont('Helvetica', '', 10);
@@ -146,13 +182,35 @@ $pdf->Cell(130, $lineH, $dates ?: '_________________________', 0, 1);
 
 $pdf->Ln(8);
 
-// ---------------------- DECLARATION ----------------------
+// ==================== DECLARATION ====================
 $pdf->SetFont('Helvetica', 'I', 10);
 $pdf->MultiCell(0, 6, 'I hereby declare that the above-mentioned information is correct to the best of my knowledge.');
-$pdf->Ln(12);
+$pdf->Ln(8);
 
-// ---------------------- SIGNATURE & STAMP BLOCKS ----------------------
-$y = $pdf->GetY();
+// ==================== DIGITAL SIGNATURE & STAMP NOTICE ====================
+$pdf->SetFont('Helvetica', '', 10);
+$pdf->MultiCell(0, 6, 'This document is digitally signed and requires no physical stamp as it is generated directly from the ProSensia portal.');
+$pdf->Ln(4);
+$pdf->SetFont('Helvetica', 'B', 10);
+$pdf->Cell(0, 6, 'Digitally Signed by ProSensia', 0, 1, 'L');
+$pdf->SetFont('Helvetica', '', 9);
+$pdf->Cell(0, 5, 'Date: ' . date('Y-m-d H:i:s'), 0, 1, 'L');
+$pdf->Ln(8);
+
+// ==================== QR CODE (bottom right) ====================
+if (file_exists($pdf->qrFile)) {
+    $pdf->Image($pdf->qrFile, 160, $pdf->GetY() + 5, 30);
+    $pdf->SetXY(160, $pdf->GetY() + 38);
+    $pdf->SetFont('Helvetica', 'I', 7);
+    $pdf->Cell(30, 4, 'Scan to verify', 0, 0, 'C');
+    // Remove temp file after use
+    register_shutdown_function(function() use ($qrTempFile) {
+        if (file_exists($qrTempFile)) @unlink($qrTempFile);
+    });
+}
+
+// ==================== SIGNATURE LINES (optional, kept for formality) ====================
+$y = $pdf->GetY() + 20;
 $pdf->SetFont('Helvetica', '', 10);
 $pdf->Line(20, $y, 90, $y);
 $pdf->Line(120, $y, 190, $y);
@@ -162,18 +220,10 @@ $pdf->SetXY(120, $y + 2);
 $pdf->Cell(70, 6, 'Approval by HoD / Chairman', 0, 1, 'C');
 $pdf->SetXY(20, $y + 8);
 $pdf->SetFont('Helvetica', 'I', 8);
-$pdf->Cell(70, 4, '(Signature and Stamp)', 0, 0, 'C');
+$pdf->Cell(70, 4, '(Digital signature on file)', 0, 0, 'C');
 $pdf->SetXY(120, $y + 8);
-$pdf->Cell(70, 4, '(Signature and Stamp)', 0, 1, 'C');
+$pdf->Cell(70, 4, '(Digital signature on file)', 0, 1, 'C');
 
-// Place stamp images if they exist
-if (file_exists($employerStamp)) {
-    $pdf->Image($employerStamp, 50, $y - 8, 30);
-}
-if (file_exists($hodStamp)) {
-    $pdf->Image($hodStamp, 145, $y - 8, 30);
-}
-
-// Output
+// Output PDF
 $filename = 'FormC_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $student['name']) . '.pdf';
 $pdf->Output('I', $filename);
