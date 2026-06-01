@@ -221,6 +221,24 @@ CREATE TABLE settings (
   v TEXT
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS intern_motivation (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL UNIQUE,
+    why_internship TEXT,
+    career_goals TEXT,
+    strengths TEXT,
+    areas_to_improve TEXT,
+    expectations TEXT,
+    past_experience TEXT,
+    projects_portfolio TEXT,
+    availability_hours TEXT,
+    preferred_mentor TEXT,
+    additional_notes TEXT,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
 -- =========================
 -- SEED DATA  (password for all = "password123")
 -- =========================

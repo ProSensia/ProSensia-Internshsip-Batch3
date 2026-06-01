@@ -30,6 +30,8 @@ function nav_link($href, $icon, $label) {
   <?php nav_link('shared/materials.php','bi-book','Materials'); ?>
   <?php nav_link('shared/attendance.php','bi-calendar-check','Attendance'); ?>
   <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
+  <!-- Motivation & Goals for interns -->
+  <?php if ($role === 'intern'): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>
 
   <div class="nav-section">Administration</div>
   <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
@@ -38,6 +40,8 @@ function nav_link($href, $icon, $label) {
   <?php nav_link('shared/messages.php','bi-chat-dots','Messages'); ?>
   <?php nav_link('shared/certificates.php','bi-award','Certificates'); ?>
   <?php nav_link('shared/subscriptions.php','bi-credit-card','Subscriptions'); ?>
+  <!-- Motivation Analysis for admin/management -->
+  <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
   <?php if ($role==='super_admin'): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
   <?php if ($role==='super_admin'): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
 </aside>
