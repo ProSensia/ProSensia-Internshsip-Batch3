@@ -224,7 +224,7 @@ if ($qrOk && file_exists($qrTempFile)) {
 }
 
 // Signature lines
-$y = $pdf->GetY() + 15;
+$y = $pdf->GetY() + 22;
 $pdf->Line(20,$y,90,$y);
 $pdf->Line(120,$y,190,$y);
 $pdf->SetXY(20,$y+2);
