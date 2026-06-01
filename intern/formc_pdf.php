@@ -1,5 +1,5 @@
 <?php
-// formc_pdf.php — redesigned with logo left, header text right
+// formc_pdf.php — ProSensia logo top‑left, ref top‑right, then partner logo + header
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
@@ -22,22 +22,22 @@ if ($role === 'intern' && (!$f || $f['status'] !== 'approved')) exit('Not approv
 
 $refNumber = 'ProSensiaB' . str_pad(3000 + (int)($f['id'] ?? 0), 4, '0', STR_PAD_LEFT);
 
-// Absolute verification URL (root)
+// Verification URL
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'];
 $verifyUrl = $protocol . '://' . $host . '/verify_formc.php?ref=' . urlencode($refNumber);
 
 // QR code
 $tempDir = __DIR__ . '/../temp';
-if (!is_dir($tempDir)) mkdir($tempDir, 0775, true);
+if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
 $qrTempFile = $tempDir . '/qr_' . uniqid() . '.png';
 $qrData = @file_get_contents('https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=200&margin=2');
 if ($qrData && file_put_contents($qrTempFile, $qrData)) $qrOk = true;
 else $qrOk = false;
 
-// Partner logo (left side) – handle WebP
-$partnerLogo = null;
-$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
+// ---- ProSensia logo (top left) ----
+$proSensiaLogo = null;
+$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
 $stmt->execute();
 $logoPath = $stmt->fetchColumn();
 if ($logoPath) {
@@ -45,7 +45,31 @@ if ($logoPath) {
     if (file_exists($full)) {
         $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
         if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
-            $tempPng = $tempDir . '/logo_' . uniqid() . '.png';
+            $tempPng = $tempDir . '/logo_ps_' . uniqid() . '.png';
+            $img = imagecreatefromwebp($full);
+            if ($img) {
+                imagepng($img, $tempPng);
+                imagedestroy($img);
+                $proSensiaLogo = $tempPng;
+                register_shutdown_function(function() use ($tempPng) { @unlink($tempPng); });
+            }
+        } elseif (in_array($ext, ['jpg','jpeg','png','gif'])) {
+            $proSensiaLogo = $full;
+        }
+    }
+}
+
+// ---- Partner logo (left, below ProSensia logo) ----
+$partnerLogo = null;
+$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
+$stmt->execute();
+$partnerPath = $stmt->fetchColumn();
+if ($partnerPath) {
+    $full = __DIR__ . '/../' . ltrim($partnerPath, '/');
+    if (file_exists($full)) {
+        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+        if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
+            $tempPng = $tempDir . '/logo_partner_' . uniqid() . '.png';
             $img = imagecreatefromwebp($full);
             if ($img) {
                 imagepng($img, $tempPng);
@@ -75,37 +99,41 @@ $pdf->SetMargins(15,15,15);
 $pdf->AddPage();
 $pdf->SetFont('Helvetica','',10);
 
-// ---- TOP SECTION: reference at top right ----
+// ----- TOP ROW: ProSensia logo (left) + Reference (right) -----
+$pdf->SetY(15);
+if ($proSensiaLogo) {
+    $pdf->Image($proSensiaLogo, 15, 10, 35);
+}
 $pdf->SetY(15);
 $pdf->SetX(150);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->Cell(45,8,'Ref: ' . $refNumber,0,1,'R');
 
-// ---- Logo (left) and Header Text (right) ----
+// ----- SECOND ROW: Partner logo (left) and University header (right) -----
+$pdf->SetY(30); // moved down to make space for ProSensia logo
 $leftX = 15;
-$rightX = 65;
-$logoWidth = 40;
+$logoWidth = 45;
 if ($partnerLogo) {
-    $pdf->Image($partnerLogo, $leftX, 25, $logoWidth);
-    $textX = $leftX + $logoWidth + 5;
+    $pdf->Image($partnerLogo, $leftX, 30, $logoWidth);
+    $textX = $leftX + $logoWidth + 8;
 } else {
-    $pdf->SetXY($leftX, 25);
+    $pdf->SetXY($leftX, 30);
     $pdf->SetFont('Helvetica','B',10);
     $pdf->Cell($logoWidth,8,'Pak-Austria Fachhochschule',0,0,'L');
-    $textX = $leftX + $logoWidth + 5;
+    $textX = $leftX + $logoWidth + 8;
 }
 
-// University header text (multi-line)
-$pdf->SetY(25);
+// University header block (right side)
+$pdf->SetY(30);
 $pdf->SetX($textX);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->MultiCell(130,6,"Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK",0,'L');
 $pdf->SetX($textX);
 $pdf->SetFont('Helvetica','',9);
 $pdf->MultiCell(130,5,"Website: https://www.paf-iast.edu.pk, Tel: +92-995-645112-116, Fax: +92-995-645117",0,'L');
-$pdf->Ln(8);
 
-// Title
+// ----- Main title (centered, below the header) -----
+$pdf->Ln(8);
 $pdf->SetFont('Helvetica','B',14);
 $pdf->Cell(0,8,'Internship Placement Proforma',0,1,'C');
 $pdf->Ln(6);
@@ -200,4 +228,6 @@ $pdf->Cell(70,4,'(Digital signature on file)',0,0,'C');
 $pdf->SetXY(120,$y+8);
 $pdf->Cell(70,4,'(Digital signature on file)',0,1,'C');
 
-$pdf->Output('I', 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf');
+$filename = 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf';
+$pdf->Output('I', $filename);
+?>
