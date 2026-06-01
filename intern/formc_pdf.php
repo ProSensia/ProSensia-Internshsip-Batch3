@@ -1,5 +1,5 @@
 <?php
-// formc_pdf.php — with visible ProSensia logo (bg rectangle) and compact partner logo
+// formc_pdf.php — ProSensia logo top‑left, ref top‑right, then partner logo + header
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
@@ -59,7 +59,7 @@ if ($logoPath) {
     }
 }
 
-// ---- Partner logo (small, aligned with university header) ----
+// ---- Partner logo (left, below ProSensia logo) ----
 $partnerLogo = null;
 $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
 $stmt->execute();
@@ -99,47 +99,32 @@ $pdf->SetMargins(15,15,15);
 $pdf->AddPage();
 $pdf->SetFont('Helvetica','',10);
 
-// ----- TOP ROW: ProSensia logo (left) with background + Reference (right) -----
-$logoX = 15;
-$logoY = 10;
-$logoWidth = 35;
-$logoHeight = 20;
-
-// Draw a light gray rectangle behind the logo to make white logos visible
-$pdf->SetFillColor(240, 240, 240);
-$pdf->Rect($logoX - 2, $logoY - 2, $logoWidth + 4, $logoHeight + 4, 'F');
-
+// ----- TOP ROW: ProSensia logo (left) + Reference (right) -----
+$pdf->SetY(15);
 if ($proSensiaLogo) {
-    $pdf->Image($proSensiaLogo, $logoX, $logoY, $logoWidth);
-} else {
-    $pdf->SetXY($logoX, $logoY);
-    $pdf->SetFont('Helvetica','B',10);
-    $pdf->Cell($logoWidth, $logoHeight, 'ProSensia', 0, 0, 'C');
+    $pdf->Image($proSensiaLogo, 15, 10, 35);
 }
-
-// Reference number
 $pdf->SetY(15);
 $pdf->SetX(150);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->Cell(45,8,'Ref: ' . $refNumber,0,1,'R');
 
-// ----- SECOND ROW: Partner logo (small, left) + University header (right) -----
-$partnerLogoY = 35;   // below ProSensia logo
-$partnerLogoWidth = 35;
-$partnerLogoHeight = 20;  // smaller, only ~2 lines height
-
+// ----- SECOND ROW: Partner logo (left) and University header (right) -----
+$pdf->SetY(30); // moved down to make space for ProSensia logo
+$leftX = 15;
+$logoWidth = 45;
 if ($partnerLogo) {
-    $pdf->Image($partnerLogo, 15, $partnerLogoY, $partnerLogoWidth);
-    $textX = 15 + $partnerLogoWidth + 8;
+    $pdf->Image($partnerLogo, $leftX, 30, $logoWidth);
+    $textX = $leftX + $logoWidth + 8;
 } else {
-    $pdf->SetXY(15, $partnerLogoY);
+    $pdf->SetXY($leftX, 30);
     $pdf->SetFont('Helvetica','B',10);
-    $pdf->Cell($partnerLogoWidth, 8, 'Pak-Austria', 0, 0, 'L');
-    $textX = 15 + $partnerLogoWidth + 8;
+    $pdf->Cell($logoWidth,8,'Pak-Austria Fachhochschule',0,0,'L');
+    $textX = $leftX + $logoWidth + 8;
 }
 
-// University header block (right side) – starts at same Y as partner logo
-$pdf->SetY($partnerLogoY);
+// University header block (right side)
+$pdf->SetY(30);
 $pdf->SetX($textX);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->MultiCell(130,6,"Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK",0,'L');
@@ -147,8 +132,8 @@ $pdf->SetX($textX);
 $pdf->SetFont('Helvetica','',9);
 $pdf->MultiCell(130,5,"Website: https://www.paf-iast.edu.pk, Tel: +92-995-645112-116, Fax: +92-995-645117",0,'L');
 
-// ----- Main title (centered, after the university header) -----
-$pdf->SetY($partnerLogoY + 22);  // fixed position after the 3 lines of text (approx 3*6 = 18mm)
+// ----- Main title (centered, below the header) -----
+$pdf->Ln(8);
 $pdf->SetFont('Helvetica','B',14);
 $pdf->Cell(0,8,'Internship Placement Proforma',0,1,'C');
 $pdf->Ln(6);
