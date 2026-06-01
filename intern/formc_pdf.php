@@ -44,7 +44,7 @@ $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https'
 $host = $_SERVER['HTTP_HOST'];
 $requestUri = $_SERVER['REQUEST_URI'];
 $scriptDir = dirname($requestUri);
-$baseUrl = $protocol . '://' . $host . rtrim($scriptDir, '/');
+$baseUrl = $protocol . '://' . $host;
 $verifyUrl = $baseUrl . '/verify_formc.php?ref=' . urlencode($refNumber);
 
 // QR code temp file

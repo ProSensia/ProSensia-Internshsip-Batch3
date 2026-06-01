@@ -1,6 +1,6 @@
 <?php
-// verify_formc.php — Public verification page
-require_once __DIR__ . '/includes/db.php';
+// verify_formc.php — Public verification page (root level)
+require_once __DIR__ . '/includes/connection.php';
 require_once __DIR__ . '/includes/functions.php';
 
 $ref = $_GET['ref'] ?? '';
@@ -10,7 +10,7 @@ if (empty($ref) || !preg_match('/^ProSensiaB(\d{4})$/', $ref, $matches)) {
 }
 
 $refNum = (int)$matches[1];
-$formId = $refNum - 3000; // because ProSensiaB3001 = id 1
+$formId = $refNum - 3000; // ProSensiaB3001 = id 1
 
 $stmt = $pdo->prepare('
     SELECT f.*, u.name, u.email, p.father_name, p.cnic, p.reg_number, p.department, p.semester, p.address, p.phone
