@@ -1,7 +1,13 @@
 <?php
-// verify_formc.php — Public verification page (root level)
-require_once __DIR__ . '/includes/connection.php';
-require_once __DIR__ . '/includes/functions.php';
+// verify_formc.php — standalone public verification page
+error_reporting(E_ALL);
+ini_set('display_errors', 1); // temporary to see errors
+
+// Direct database connection (adjust credentials if needed)
+require_once __DIR__ . '/includes/connection.php'; // this should create $pdo
+
+// If your connection.php uses a different variable, adjust below
+// For example, some use $conn or $db. Check your connection.php content.
 
 $ref = $_GET['ref'] ?? '';
 if (empty($ref) || !preg_match('/^ProSensiaB(\d{4})$/', $ref, $matches)) {
@@ -12,19 +18,31 @@ if (empty($ref) || !preg_match('/^ProSensiaB(\d{4})$/', $ref, $matches)) {
 $refNum = (int)$matches[1];
 $formId = $refNum - 3000; // ProSensiaB3001 = id 1
 
-$stmt = $pdo->prepare('
-    SELECT f.*, u.name, u.email, p.father_name, p.cnic, p.reg_number, p.department, p.semester, p.address, p.phone
-    FROM form_c f
-    JOIN users u ON u.id = f.user_id
-    LEFT JOIN profiles p ON p.user_id = u.id
-    WHERE f.id = ? AND f.status = "approved"
-');
-$stmt->execute([$formId]);
-$form = $stmt->fetch();
+try {
+    $stmt = $pdo->prepare('
+        SELECT f.*, u.name, u.email, p.father_name, p.cnic, p.reg_number, p.department, p.semester, p.address, p.phone
+        FROM form_c f
+        JOIN users u ON u.id = f.user_id
+        LEFT JOIN profiles p ON p.user_id = u.id
+        WHERE f.id = ? AND f.status = "approved"
+    ');
+    $stmt->execute([$formId]);
+    $form = $stmt->fetch();
+} catch (PDOException $e) {
+    http_response_code(500);
+    die('Database error: ' . $e->getMessage());
+}
 
 if (!$form) {
     http_response_code(404);
     die('Form C not found or not approved.');
+}
+
+// Helper function to generate base URL (similar to base_url() but standalone)
+function site_url($path = '') {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    return $protocol . '://' . $host . '/' . ltrim($path, '/');
 }
 ?>
 <!DOCTYPE html>
@@ -74,7 +92,7 @@ if (!$form) {
     <hr>
     <p class="text-muted small">This document is digitally signed and issued by ProSensia. No physical stamp required. <br> Verification timestamp: <?= date('Y-m-d H:i:s') ?></p>
     <div class="text-center mt-3">
-        <a href="<?= base_url('intern/formc_pdf.php?uid=' . $form['user_id']) ?>" class="btn btn-primary btn-sm">Download original PDF</a>
+        <a href="<?= site_url('intern/formc_pdf.php?uid=' . $form['user_id']) ?>" class="btn btn-primary btn-sm">Download original PDF</a>
     </div>
 </div>
 </body>
