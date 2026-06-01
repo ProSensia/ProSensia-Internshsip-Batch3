@@ -1,5 +1,5 @@
 <?php
-// formc_pdf.php — ProSensia logo top‑left, ref top‑right, then partner logo + header
+// formc_pdf.php — compact one-page layout, small partner logo
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
@@ -22,7 +22,6 @@ if ($role === 'intern' && (!$f || $f['status'] !== 'approved')) exit('Not approv
 
 $refNumber = 'ProSensiaB' . str_pad(3000 + (int)($f['id'] ?? 0), 4, '0', STR_PAD_LEFT);
 
-// Verification URL
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'];
 $verifyUrl = $protocol . '://' . $host . '/verify_formc.php?ref=' . urlencode($refNumber);
@@ -31,11 +30,11 @@ $verifyUrl = $protocol . '://' . $host . '/verify_formc.php?ref=' . urlencode($r
 $tempDir = __DIR__ . '/../temp';
 if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
 $qrTempFile = $tempDir . '/qr_' . uniqid() . '.png';
-$qrData = @file_get_contents('https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=200&margin=2');
+$qrData = @file_get_contents('https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=150&margin=2');
 if ($qrData && file_put_contents($qrTempFile, $qrData)) $qrOk = true;
 else $qrOk = false;
 
-// ---- ProSensia logo (top left) ----
+// ProSensia logo
 $proSensiaLogo = null;
 $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
 $stmt->execute();
@@ -59,7 +58,7 @@ if ($logoPath) {
     }
 }
 
-// ---- Partner logo (left, below ProSensia logo) ----
+// Partner logo (small)
 $partnerLogo = null;
 $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
 $stmt->execute();
@@ -83,7 +82,7 @@ if ($partnerPath) {
     }
 }
 
-class RedesignedFormC extends FPDF
+class OnePageFormC extends FPDF
 {
     function Header() {}
     function Footer() {
@@ -93,141 +92,152 @@ class RedesignedFormC extends FPDF
     }
 }
 
-$pdf = new RedesignedFormC('P','mm','A4');
+$pdf = new OnePageFormC('P','mm','A4');
 $pdf->AliasNbPages();
 $pdf->SetMargins(15,15,15);
 $pdf->AddPage();
 $pdf->SetFont('Helvetica','',10);
 
-// ----- TOP ROW: ProSensia logo (left) + Reference (right) -----
-$pdf->SetY(15);
-if ($proSensiaLogo) {
-    $pdf->Image($proSensiaLogo, 15, 10, 35);
-}
+// Disable auto page break to force one page (we'll manually ensure content fits)
+$pdf->SetAutoPageBreak(false);
+
+// ----- Top row: ProSensia logo with background + Reference -----
+$logoX = 15;
+$logoY = 10;
+$logoWidth = 30;
+$logoHeight = 18;
+$pdf->SetFillColor(240,240,240);
+$pdf->Rect($logoX-2, $logoY-2, $logoWidth+4, $logoHeight+4, 'F');
+if ($proSensiaLogo) $pdf->Image($proSensiaLogo, $logoX, $logoY, $logoWidth);
+else { $pdf->SetXY($logoX, $logoY); $pdf->SetFont('Helvetica','B',10); $pdf->Cell($logoWidth, $logoHeight, 'ProSensia',0,0,'C'); }
+
 $pdf->SetY(15);
 $pdf->SetX(150);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->Cell(45,8,'Ref: ' . $refNumber,0,1,'R');
 
-// ----- SECOND ROW: Partner logo (left) and University header (right) -----
-$pdf->SetY(30); // moved down to make space for ProSensia logo
-$leftX = 15;
-$logoWidth = 45;
+// ----- Second row: Partner logo (small) + University header -----
+$partnerY = 32;
+$partnerW = 25;  // smaller width
+$partnerH = 18;  // smaller height
 if ($partnerLogo) {
-    $pdf->Image($partnerLogo, $leftX, 30, $logoWidth);
-    $textX = $leftX + $logoWidth + 8;
+    $pdf->Image($partnerLogo, 15, $partnerY, $partnerW);
+    $textX = 15 + $partnerW + 6;
 } else {
-    $pdf->SetXY($leftX, 30);
-    $pdf->SetFont('Helvetica','B',10);
-    $pdf->Cell($logoWidth,8,'Pak-Austria Fachhochschule',0,0,'L');
-    $textX = $leftX + $logoWidth + 8;
+    $pdf->SetXY(15, $partnerY);
+    $pdf->SetFont('Helvetica','B',9);
+    $pdf->Cell($partnerW, 5, 'Pak-Austria',0,0,'L');
+    $textX = 15 + $partnerW + 6;
 }
 
-// University header block (right side)
-$pdf->SetY(30);
+$pdf->SetY($partnerY);
 $pdf->SetX($textX);
-$pdf->SetFont('Helvetica','B',11);
-$pdf->MultiCell(130,6,"Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK",0,'L');
+$pdf->SetFont('Helvetica','B',10);
+$pdf->MultiCell(130,5,"Pak-Austria Fachhochschule: Institute of Applied Sciences and Technology, Mang, Haripur, KPK",0,'L');
 $pdf->SetX($textX);
+$pdf->SetFont('Helvetica','',8);
+$pdf->MultiCell(130,4,"Website: https://www.paf-iast.edu.pk, Tel: +92-995-645112-116, Fax: +92-995-645117",0,'L');
+
+// ----- Title -----
+$pdf->SetY($partnerY + 24);
+$pdf->SetFont('Helvetica','B',13);
+$pdf->Cell(0,6,'Internship Placement Proforma',0,1,'C');
+$pdf->Ln(4);
+
+// ----- Student Info (compact) -----
+$pdf->SetFont('Helvetica','B',10);
+$pdf->Cell(0,6,'Student Information:',0,1);
 $pdf->SetFont('Helvetica','',9);
-$pdf->MultiCell(130,5,"Website: https://www.paf-iast.edu.pk, Tel: +92-995-645112-116, Fax: +92-995-645117",0,'L');
-
-// ----- Main title (centered, below the header) -----
-$pdf->Ln(8);
-$pdf->SetFont('Helvetica','B',14);
-$pdf->Cell(0,8,'Internship Placement Proforma',0,1,'C');
-$pdf->Ln(6);
-
-// ----- Student Information (two columns) -----
-$pdf->SetFont('Helvetica','B',11);
-$pdf->Cell(0,8,'Student Information:',0,1);
-$pdf->SetFont('Helvetica','',10);
-$left=15; $right=105; $h=8;
+$h=6;
+$left=15; $right=105;
 $y = $pdf->GetY();
 
-$pdf->SetXY($left,$y); $pdf->Cell(35,$h,'Student Name:',0,0);
-$pdf->Cell(55,$h,$student['name']?:'_________________________',0,0);
-$pdf->SetXY($right,$y); $pdf->Cell(35,$h,'Father Name:',0,0);
-$pdf->Cell(55,$h,$student['father_name']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(32,$h,'Student Name:',0,0);
+$pdf->Cell(58,$h,$student['name']?:'_________________________',0,0);
+$pdf->SetXY($right,$y); $pdf->Cell(32,$h,'Father Name:',0,0);
+$pdf->Cell(48,$h,$student['father_name']?:'_________________________',0,1);
 
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(35,$h,'Registration #:',0,0);
-$pdf->Cell(55,$h,$student['reg_number']?:'_________________________',0,0);
-$pdf->SetXY($right,$y); $pdf->Cell(35,$h,'Department:',0,0);
-$pdf->Cell(55,$h,$student['department']?:'Electrical and Computer Engineering',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(32,$h,'Registration #:',0,0);
+$pdf->Cell(58,$h,$student['reg_number']?:'_________________________',0,0);
+$pdf->SetXY($right,$y); $pdf->Cell(32,$h,'Department:',0,0);
+$pdf->Cell(48,$h,$student['department']?:'Electrical and Computer Engineering',0,1);
 
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(35,$h,'CNIC #:',0,0);
-$pdf->Cell(55,$h,$student['cnic']?:'_________________________',0,0);
-$pdf->SetXY($right,$y); $pdf->Cell(35,$h,'Contact number:',0,0);
-$pdf->Cell(55,$h,$student['phone']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(32,$h,'CNIC #:',0,0);
+$pdf->Cell(58,$h,$student['cnic']?:'_________________________',0,0);
+$pdf->SetXY($right,$y); $pdf->Cell(32,$h,'Contact number:',0,0);
+$pdf->Cell(48,$h,$student['phone']?:'_________________________',0,1);
 
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(35,$h,'Email:',0,0);
-$pdf->Cell(55,$h,$student['email']?:'_________________________',0,0);
-$pdf->SetXY($right,$y); $pdf->Cell(35,$h,'Internship semester:',0,0);
-$pdf->Cell(55,$h,$student['semester']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(32,$h,'Email:',0,0);
+$pdf->Cell(58,$h,$student['email']?:'_________________________',0,0);
+$pdf->SetXY($right,$y); $pdf->Cell(32,$h,'Internship semester:',0,0);
+$pdf->Cell(48,$h,$student['semester']?:'_________________________',0,1);
 
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(35,$h,'Present Address:',0,0);
-$pdf->MultiCell(160,$h,$student['address']?:'_________________________',0,'L');
-$pdf->Ln(4);
+$pdf->SetXY($left,$y); $pdf->Cell(32,$h,'Present Address:',0,0);
+// Use Cell instead of MultiCell to avoid page break
+$address = $student['address'] ?: '_________________________';
+$pdf->Cell(158,$h,$address,0,1);
+$pdf->Ln(2);
 
 // ----- Employer Section -----
-$pdf->SetFont('Helvetica','B',11);
-$pdf->Cell(0,8,'To be filled by Internship Industry/Organization Representative',0,1);
-$pdf->SetFont('Helvetica','',10);
+$pdf->SetFont('Helvetica','B',10);
+$pdf->Cell(0,6,'To be filled by Internship Industry/Organization Representative',0,1);
+$pdf->SetFont('Helvetica','',9);
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(50,$h,'Internship employer name:',0,0);
-$pdf->Cell(130,$h,$f['employer_name']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(45,$h,'Internship employer name:',0,0);
+$pdf->Cell(140,$h,$f['employer_name']?:'_________________________',0,1);
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(50,$h,'Internship department:',0,0);
-$pdf->Cell(130,$h,$f['employer_dept']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(45,$h,'Internship department:',0,0);
+$pdf->Cell(140,$h,$f['employer_dept']?:'_________________________',0,1);
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(50,$h,'Joining date:',0,0);
-$pdf->Cell(130,$h,$f['joining_date']?:'_________________________',0,1);
+$pdf->SetXY($left,$y); $pdf->Cell(45,$h,'Joining date:',0,0);
+$pdf->Cell(140,$h,$f['joining_date']?:'_________________________',0,1);
 $y=$pdf->GetY();
-$pdf->SetXY($left,$y); $pdf->Cell(50,$h,'Dates of internship:',0,0);
+$pdf->SetXY($left,$y); $pdf->Cell(45,$h,'Dates of internship:',0,0);
 $dates = ($f['start_date']??'').'   to   '.($f['end_date']??'');
-$pdf->Cell(130,$h,$dates?:'_________________________',0,1);
-$pdf->Ln(8);
+$pdf->Cell(140,$h,$dates?:'_________________________',0,1);
+$pdf->Ln(4);
 
 // Declaration
-$pdf->SetFont('Helvetica','I',10);
-$pdf->MultiCell(0,6,'I hereby declare that the above-mentioned information is correct to the best of my knowledge.');
-$pdf->Ln(8);
-$pdf->SetFont('Helvetica','',10);
-$pdf->MultiCell(0,6,'This document is digitally signed and requires no physical stamp as it is generated directly from the ProSensia portal.');
-$pdf->Ln(4);
-$pdf->SetFont('Helvetica','B',10);
-$pdf->Cell(0,6,'Digitally Signed by ProSensia',0,1,'L');
+$pdf->SetFont('Helvetica','I',9);
+$pdf->MultiCell(0,5,'I hereby declare that the above-mentioned information is correct to the best of my knowledge.');
+$pdf->Ln(3);
 $pdf->SetFont('Helvetica','',9);
-$pdf->Cell(0,5,'Date: '.date('Y-m-d H:i:s'),0,1,'L');
-$pdf->Ln(8);
+$pdf->MultiCell(0,5,'This document is digitally signed and requires no physical stamp as it is generated directly from the ProSensia portal.');
+$pdf->Ln(2);
+$pdf->SetFont('Helvetica','B',9);
+$pdf->Cell(0,5,'Digitally Signed by ProSensia',0,1,'L');
+$pdf->SetFont('Helvetica','',8);
+$pdf->Cell(0,4,'Date: '.date('Y-m-d H:i:s'),0,1,'L');
+$pdf->Ln(5);
 
 // QR code (bottom right)
 if ($qrOk && file_exists($qrTempFile)) {
-    $pdf->Image($qrTempFile, 160, $pdf->GetY()+5, 30);
-    $pdf->SetXY(160, $pdf->GetY()+38);
-    $pdf->SetFont('Helvetica','I',7);
-    $pdf->Cell(30,4,'Scan to verify',0,0,'C');
+    $pdf->Image($qrTempFile, 160, $pdf->GetY()+2, 25);
+    $pdf->SetXY(160, $pdf->GetY()+30);
+    $pdf->SetFont('Helvetica','I',6);
+    $pdf->Cell(25,4,'Scan to verify',0,0,'C');
     register_shutdown_function(function() use ($qrTempFile) { @unlink($qrTempFile); });
 }
 
 // Signature lines
-$y = $pdf->GetY() + 20;
+$y = $pdf->GetY() + 15;
 $pdf->Line(20,$y,90,$y);
 $pdf->Line(120,$y,190,$y);
 $pdf->SetXY(20,$y+2);
-$pdf->Cell(70,6,'Approval of Employer',0,0,'C');
+$pdf->SetFont('Helvetica','',9);
+$pdf->Cell(70,5,'Approval of Employer',0,0,'C');
 $pdf->SetXY(120,$y+2);
-$pdf->Cell(70,6,'Approval by HoD / Chairman',0,1,'C');
-$pdf->SetXY(20,$y+8);
-$pdf->SetFont('Helvetica','I',8);
+$pdf->Cell(70,5,'Approval by HoD / Chairman',0,1,'C');
+$pdf->SetXY(20,$y+7);
+$pdf->SetFont('Helvetica','I',7);
 $pdf->Cell(70,4,'(Digital signature on file)',0,0,'C');
-$pdf->SetXY(120,$y+8);
+$pdf->SetXY(120,$y+7);
 $pdf->Cell(70,4,'(Digital signature on file)',0,1,'C');
 
-$filename = 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf';
-$pdf->Output('I', $filename);
+// Ensure one page – if content exceeds, we'll shrink further, but likely fits now
+$pdf->Output('I', 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf');
 ?>
