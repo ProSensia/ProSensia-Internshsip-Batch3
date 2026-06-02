@@ -1,6 +1,9 @@
 <?php
 // includes/connection.php — central MySQL connection (PDO).
 // Edit credentials below to match your local / cPanel server.
+date_default_timezone_set('Asia/Karachi'); 
+$pdo->exec("SET time_zone = '+05:00'");
+
 
 $DB_HOST = 'premium281.web-hosting.com';
 $DB_NAME = 'prosdfwo_internship_batch3';
