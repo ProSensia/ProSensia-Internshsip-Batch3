@@ -76,7 +76,7 @@ $qrOk = ($qrData && file_put_contents($qrTempFile, $qrData)) ? true : false;
 |--------------------------------------------------------------------------
 */
 $proSensiaLogo = null;
-$blackLogoPath = __DIR__ . '/../assets/images/prosensia-logo-black.png';
+$blackLogoPath = __DIR__ . '/../assets/img/prosensia-logo-black.png';
 
 if (file_exists($blackLogoPath)) {
     $proSensiaLogo = $blackLogoPath;   // use the black PNG directly
