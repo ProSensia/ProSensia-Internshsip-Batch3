@@ -96,6 +96,19 @@ if ($role === 'intern') {
                 <i class="bi bi-file-earmark-pdf me-1"></i> Download Approved Form C (PDF)
             </a>
         </div>
+        <?php if ($status === 'approved'): ?>
+            <div class="mb-3">
+                <a class="btn btn-success" href="<?= base_url('intern/formc_pdf.php') ?>" target="_blank">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Download Approved Form C (PDF)
+                </a>
+            </div>
+        <?php elseif ($status === 'submitted'): ?>
+            <div class="alert alert-info">Your form is under review. You will be notified when approved.</div>
+        <?php elseif ($status === 'rejected' && !empty($f['reviewer_note'])): ?>
+            <div class="alert alert-danger">Rejected reason: <?= e($f['reviewer_note']) ?></div>
+        <?php endif; ?>
+
+        <!-- Admit Card button - visible for both submitted and approved -->
         <?php if ($status === 'submitted' || $status === 'approved'): ?>
             <div class="mb-3">
                 <a class="btn btn-info" href="<?= base_url('intern/admit_card.php') ?>" target="_blank">
