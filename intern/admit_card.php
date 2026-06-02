@@ -1,37 +1,25 @@
 <?php
-// admit_card.php — Internship Admit Card (ProSensia only)
+// admit_card.php — Internship Admit Card (generated from profile, no Form C required)
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
 
 $uid = $user['id'];
 
-// Fetch Form C
-$fc = $pdo->prepare('SELECT * FROM form_c WHERE user_id = ?');
-$fc->execute([$uid]);
-$f = $fc->fetch();
-
-if (!$f) {
-    flash('No Form C record found. Please submit Form C first.', 'warning');
-    header('Location: ' . base_url('intern/formc.php'));
-    exit;
-}
-
-$status = strtolower(trim($f['status']));
-if (!in_array($status, ['submitted', 'approved'])) {
-    flash('Your Form C status is "' . $status . '". Only submitted or approved forms can download the admit card.', 'warning');
-    header('Location: ' . base_url('intern/formc.php'));
-    exit;
-}
-// Get student profile
+// Get student profile (must exist)
 $prof = $pdo->prepare('SELECT * FROM profiles WHERE user_id = ?');
 $prof->execute([$uid]);
-$profile = $prof->fetch() ?: [];
+$profile = $prof->fetch();
+if (!$profile) {
+    flash('Please complete your profile first.', 'warning');
+    header('Location: ' . base_url('intern/profile.php'));
+    exit;
+}
 
-// Generate admit card number
-$refNumber = 'ProSensiaB' . str_pad(3000 + (int)($f['id'] ?? 0), 4, '0', STR_PAD_LEFT);
+// Generate unique admit card number (based on user ID)
+$refNumber = 'ADMIT-' . str_pad($uid, 6, '0', STR_PAD_LEFT);
 
-// ProSensia logo (with WebP support)
+// ProSensia logo
 $proSensiaLogo = null;
 $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
 $stmt->execute();
@@ -138,14 +126,16 @@ foreach ($fields as $label => $val) {
     $y = $pdf->GetY();
 }
 
-// Exam details
+// Internship period (if available from Form C, else show placeholder)
+$start_date = $profile['start_date'] ?? '_____';
+$end_date = $profile['end_date'] ?? '_____';
 $pdf->SetY($y + 5);
 $pdf->SetFont('Helvetica','B',11);
 $pdf->Cell(0,8,'Examination Details',0,1);
 $pdf->SetFont('Helvetica','',10);
 $pdf->SetX(20);
 $pdf->Cell(45, $lineH, 'Internship Period:', 0, 0);
-$pdf->Cell(60, $lineH, ($f['start_date'] ?? '_____') . '  to  ' . ($f['end_date'] ?? '_____'), 0, 1);
+$pdf->Cell(60, $lineH, $start_date . '  to  ' . $end_date, 0, 1);
 $pdf->SetX(20);
 $pdf->Cell(45, $lineH, 'Venue:', 0, 0);
 $pdf->Cell(60, $lineH, 'ProSensia Portal (Online)', 0, 1);
