@@ -8,44 +8,32 @@ require_role(['intern', 'super_admin', 'management']);
 $uid = $user['id'];
 $role = $user['role'];
 
-// Define available courses
-$courses = [
-    'Full Stack Web Development',
-    'AI & Machine Learning',
-    'Python Development',
-    'Cyber Security',
-    'Software Testing / QA',
-    'Graphic Designing',
-    'C++ Programming',
-    'Data Science',
-    'Cloud Computing'
-];
-
-// Define batches
-$batches = ['Batch 1 (Spring 2025)', 'Batch 2 (Summer 2025)', 'Batch 3 (Fall 2025)', 'Batch 4 (Winter 2026)'];
+// Fetch courses and batches from database
+$courses = $pdo->query('SELECT id, name FROM courses ORDER BY name')->fetchAll();
+$batches = $pdo->query('SELECT id, name FROM batches ORDER BY name')->fetchAll();
 
 // Process enrollment submission (only for interns)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'intern') {
-    $track = $_POST['track'] ?? '';
-    $batch = $_POST['batch'] ?? '';
+    $course_id = $_POST['course_id'] ?? '';
+    $batch_id  = $_POST['batch_id'] ?? '';
     $start_date = $_POST['start_date'] ?? null;
     $payment_plan = $_POST['payment_plan'] ?? 'monthly';
     $agreed = isset($_POST['agreed']) ? 1 : 0;
 
     $errors = [];
-    if (!$track) $errors[] = 'Please select a course.';
-    if (!$batch) $errors[] = 'Please select a batch.';
+    if (!$course_id) $errors[] = 'Please select a course.';
+    if (!$batch_id) $errors[] = 'Please select a batch.';
     if (!$agreed) $errors[] = 'You must agree to the terms.';
 
     if (empty($errors)) {
         $stmt = $pdo->prepare('SELECT id FROM enrollments WHERE user_id = ?');
         $stmt->execute([$uid]);
         if ($stmt->fetch()) {
-            $upd = $pdo->prepare('UPDATE enrollments SET track=?, batch=?, start_date=?, payment_plan=?, agreed=?, status="submitted", submitted_at=NOW() WHERE user_id=?');
-            $upd->execute([$track, $batch, $start_date, $payment_plan, $agreed, $uid]);
+            $upd = $pdo->prepare('UPDATE enrollments SET course_id=?, batch_id=?, start_date=?, payment_plan=?, agreed=?, status="submitted", submitted_at=NOW() WHERE user_id=?');
+            $upd->execute([$course_id, $batch_id, $start_date, $payment_plan, $agreed, $uid]);
         } else {
-            $ins = $pdo->prepare('INSERT INTO enrollments (user_id, track, batch, start_date, payment_plan, agreed, status, submitted_at) VALUES (?,?,?,?,?,?,"submitted",NOW())');
-            $ins->execute([$uid, $track, $batch, $start_date, $payment_plan, $agreed]);
+            $ins = $pdo->prepare('INSERT INTO enrollments (user_id, course_id, batch_id, start_date, payment_plan, agreed, status, submitted_at) VALUES (?,?,?,?,?,?,"submitted",NOW())');
+            $ins->execute([$uid, $course_id, $batch_id, $start_date, $payment_plan, $agreed]);
         }
         flash('Enrollment submitted. Awaiting admin approval.', 'success');
         header('Location: ' . base_url('intern/enrollment.php'));
@@ -58,10 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'intern') {
 // For admin/management: show all enrollments
 if (in_array($role, ['super_admin', 'management'])) {
     $enrollments = $pdo->query('
-        SELECT e.*, u.name, u.email, p.reg_number 
+        SELECT e.*, u.name, u.email, p.reg_number,
+               c.name AS course_name, b.name AS batch_name
         FROM enrollments e 
         JOIN users u ON u.id = e.user_id 
         LEFT JOIN profiles p ON p.user_id = u.id 
+        LEFT JOIN courses c ON c.id = e.course_id
+        LEFT JOIN batches b ON b.id = e.batch_id
         ORDER BY e.submitted_at DESC
     ')->fetchAll();
     ?>
@@ -78,8 +69,8 @@ if (in_array($role, ['super_admin', 'management'])) {
                     <tr>
                         <td><?= e($e['name']) ?></td>
                         <td><?= e($e['reg_number'] ?? '—') ?></td>
-                        <td><?= e($e['track']) ?></td>
-                        <td><?= e($e['batch']) ?></td>
+                        <td><?= e($e['course_name'] ?? '—') ?></td>
+                        <td><?= e($e['batch_name'] ?? '—') ?></td>
                         <td><?= e($e['start_date']) ?></td>
                         <td><?= e($e['payment_plan']) ?></td>
                         <td><span class="badge <?= $e['status'] === 'approved' ? 'b-success' : ($e['status'] === 'rejected' ? 'b-danger' : 'b-warning') ?>"><?= ucfirst($e['status']) ?></span></td>
@@ -113,7 +104,11 @@ if (in_array($role, ['super_admin', 'management'])) {
     }
 } else {
     // Intern view: show enrollment form and current status
-    $stmt = $pdo->prepare('SELECT * FROM enrollments WHERE user_id = ?');
+    $stmt = $pdo->prepare('SELECT e.*, c.name AS course_name, b.name AS batch_name
+                           FROM enrollments e
+                           LEFT JOIN courses c ON c.id = e.course_id
+                           LEFT JOIN batches b ON b.id = e.batch_id
+                           WHERE e.user_id = ?');
     $stmt->execute([$uid]);
     $enroll = $stmt->fetch();
     $status = $enroll['status'] ?? 'draft';
@@ -134,19 +129,23 @@ if (in_array($role, ['super_admin', 'management'])) {
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Select Course <span class="text-danger">*</span></label>
-                    <select class="form-select" name="track" required>
+                    <select class="form-select" name="course_id" required>
                         <option value="">-- Choose --</option>
                         <?php foreach ($courses as $c): ?>
-                            <option value="<?= e($c) ?>" <?= ($enroll['track'] ?? '') === $c ? 'selected' : '' ?>><?= e($c) ?></option>
+                            <option value="<?= $c['id'] ?>" <?= (isset($enroll['course_id']) && $enroll['course_id'] == $c['id']) ? 'selected' : '' ?>>
+                                <?= e($c['name']) ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Select Batch <span class="text-danger">*</span></label>
-                    <select class="form-select" name="batch" required>
+                    <select class="form-select" name="batch_id" required>
                         <option value="">-- Choose --</option>
                         <?php foreach ($batches as $b): ?>
-                            <option value="<?= e($b) ?>" <?= ($enroll['batch'] ?? '') === $b ? 'selected' : '' ?>><?= e($b) ?></option>
+                            <option value="<?= $b['id'] ?>" <?= (isset($enroll['batch_id']) && $enroll['batch_id'] == $b['id']) ? 'selected' : '' ?>>
+                                <?= e($b['name']) ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
