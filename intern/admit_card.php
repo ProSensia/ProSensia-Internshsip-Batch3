@@ -6,6 +6,10 @@ require_once __DIR__ . '/../lib/fpdf.php';
 
 $uid = $user['id'];
 
+echo "<pre>";
+var_dump($user);
+die();
+
 // Fetch Form C
 $fc = $pdo->prepare('SELECT * FROM form_c WHERE user_id = ?');
 $fc->execute([$uid]);
