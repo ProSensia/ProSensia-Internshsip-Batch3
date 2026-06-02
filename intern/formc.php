@@ -12,21 +12,16 @@ $role = $user['role'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save' && $role === 'intern') {
     $employer_name = trim($_POST['employer_name'] ?? '');
     $employer_dept = trim($_POST['employer_dept'] ?? '');
-    $joining_date = $_POST['joining_date'] ?? null;
-    $start_date = $_POST['start_date'] ?? null;
-    $end_date = $_POST['end_date'] ?? null;
+    $joining_date  = $_POST['joining_date'] ?? null;
+    $start_date    = $_POST['start_date'] ?? null;
+    $end_date      = $_POST['end_date'] ?? null;
 
     $errors = [];
-    if (empty($employer_name))
-        $errors[] = 'Employer name is required.';
-    if (empty($employer_dept))
-        $errors[] = 'Internship department is required.';
-    if (empty($joining_date))
-        $errors[] = 'Joining date is required.';
-    if (empty($start_date))
-        $errors[] = 'Start date is required.';
-    if (empty($end_date))
-        $errors[] = 'End date is required.';
+    if (empty($employer_name)) $errors[] = 'Employer name is required.';
+    if (empty($employer_dept)) $errors[] = 'Internship department is required.';
+    if (empty($joining_date))  $errors[] = 'Joining date is required.';
+    if (empty($start_date))    $errors[] = 'Start date is required.';
+    if (empty($end_date))      $errors[] = 'End date is required.';
 
     if (empty($errors)) {
         $exists = $pdo->prepare('SELECT id FROM form_c WHERE user_id = ?');
@@ -49,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
 // ------------------- Admin: review -------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'review' && in_array($role, ['super_admin', 'management'], true)) {
     $status = $_POST['status'] ?? 'rejected';
-    $note = trim($_POST['note'] ?? '');
-    $id = (int) ($_POST['id'] ?? 0);
+    $note   = trim($_POST['note'] ?? '');
+    $id     = (int)($_POST['id'] ?? 0);
     $pdo->prepare('UPDATE form_c SET status=?, reviewer_note=? WHERE id=?')
         ->execute([$status, $note, $id]);
     flash('Form C ' . $status . '.', 'info');
@@ -87,8 +82,7 @@ if ($role === 'intern') {
     $status = $f['status'] ?? 'draft';
     ?>
     <h1 class="serif" style="font-size:34px">Form C — Internship Placement Proforma</h1>
-    <p class="muted">Your personal details are auto-filled from your profile. Fill in the employer section completely before
-        submitting. After admin approval you can download the official PDF.</p>
+    <p class="muted">Your personal details are auto-filled from your profile. Fill in the employer section completely before submitting. After admin approval you can download the official PDF.</p>
 
     <?php if ($status === 'approved'): ?>
         <div class="mb-3">
@@ -96,30 +90,19 @@ if ($role === 'intern') {
                 <i class="bi bi-file-earmark-pdf me-1"></i> Download Approved Form C (PDF)
             </a>
         </div>
-        <?php if ($status === 'approved'): ?>
-            <div class="mb-3">
-                <a class="btn btn-success" href="<?= base_url('intern/formc_pdf.php') ?>" target="_blank">
-                    <i class="bi bi-file-earmark-pdf me-1"></i> Download Approved Form C (PDF)
-                </a>
-            </div>
-        <?php elseif ($status === 'submitted'): ?>
-            <div class="alert alert-info">Your form is under review. You will be notified when approved.</div>
-        <?php elseif ($status === 'rejected' && !empty($f['reviewer_note'])): ?>
-            <div class="alert alert-danger">Rejected reason: <?= e($f['reviewer_note']) ?></div>
-        <?php endif; ?>
-
-        <!-- Admit Card button - visible for both submitted and approved -->
-        <?php if ($status === 'submitted' || $status === 'approved'): ?>
-            <div class="mb-3">
-                <a class="btn btn-info" href="<?= base_url('intern/admit_card.php') ?>" target="_blank">
-                    <i class="bi bi-ticket-perforated me-1"></i> Download Admit Card
-                </a>
-            </div>
-        <?php endif; ?>
     <?php elseif ($status === 'submitted'): ?>
         <div class="alert alert-info">Your form is under review. You will be notified when approved.</div>
     <?php elseif ($status === 'rejected' && !empty($f['reviewer_note'])): ?>
         <div class="alert alert-danger">Rejected reason: <?= e($f['reviewer_note']) ?></div>
+    <?php endif; ?>
+
+    <!-- Admit Card button - visible for both submitted and approved -->
+    <?php if ($status === 'submitted' || $status === 'approved'): ?>
+        <div class="mb-3">
+            <a class="btn btn-info" href="<?= base_url('intern/admit_card.php') ?>" target="_blank">
+                <i class="bi bi-ticket-perforated me-1"></i> Download Admit Card
+            </a>
+        </div>
     <?php endif; ?>
 
     <form method="post" class="glass card-pad mt-2">
