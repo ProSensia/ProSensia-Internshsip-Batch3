@@ -238,7 +238,7 @@ $pdf->Cell(70,5,'Approval by HoD / Chairman',0,1,'C');
 $pdf->SetXY(20,$y+7);
 $pdf->SetFont('Helvetica','I',7);
 $pdf->Cell(70,4,'(Digital signature on file)',0,0,'C');
-$pdf->SetXY(120,$y+7);
-$pdf->Cell(70,4,'(Digital signature on file)',0,1,'C');
+// $pdf->SetXY(120,$y+7);
+// $pdf->Cell(70,4,'(Digital signature on file)',0,1,'C');
 
 $pdf->Output('I', 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf');
