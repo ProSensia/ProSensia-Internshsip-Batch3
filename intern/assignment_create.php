@@ -8,7 +8,7 @@ require_login();
 $uid = $user['id'];
 $role = $user['role'];
 
-// Only super_admin, management, or team leads (mentor with lead role) can create assignments
+// ---------- PERMISSION CHECK ----------
 $allowed = false;
 $is_lead = false;
 $lead_team_id = null;
@@ -17,7 +17,6 @@ $lead_team_name = '';
 if (in_array($role, ['super_admin', 'management'])) {
     $allowed = true;
 } elseif ($role === 'mentor') {
-    // Check if mentor is a team lead
     $stmt = $pdo->prepare('SELECT t.id, t.name FROM team_members tm JOIN teams t ON t.id = tm.team_id WHERE tm.user_id = ? AND tm.role_in_team = "lead" LIMIT 1');
     $stmt->execute([$uid]);
     $lead = $stmt->fetch();
@@ -34,62 +33,93 @@ if (!$allowed) {
     die('<div class="container mt-5"><h3>Access Denied</h3><p>Only administrators, management, or team leads can create assignments.</p></div>');
 }
 
-// Fetch courses (for super_admin/management)
+// ---------- FETCH OPTIONS ----------
 $courses = [];
-if (in_array($role, ['super_admin', 'management'])) {
-    $courses = $pdo->query('SELECT id, name FROM courses ORDER BY name')->fetchAll();
-}
+$interns = [];            // for leads: team members
+$interns_with_course = []; // for admin/management: all approved interns with course info
 
-// Fetch interns based on role
-if ($is_lead) {
-    // Get members of the lead's team (excluding the lead themselves)
-    $interns = $pdo->prepare('SELECT u.id, u.name, p.reg_number FROM team_members tm JOIN users u ON u.id = tm.user_id LEFT JOIN profiles p ON p.user_id = u.id WHERE tm.team_id = ? AND u.role = "intern" ORDER BY u.name');
+if (in_array($role, ['super_admin', 'management'])) {
+    // All courses for the dropdown
+    $courses = $pdo->query('SELECT id, name FROM courses ORDER BY name')->fetchAll();
+
+    // All approved interns with their course_id (used for filtering)
+    $interns_with_course = $pdo->query('
+        SELECT u.id, u.name, p.reg_number, e.course_id
+        FROM users u
+        JOIN enrollments e ON e.user_id = u.id AND e.status = "approved"
+        LEFT JOIN profiles p ON p.user_id = u.id
+        WHERE u.role = "intern"
+        ORDER BY u.name
+    ')->fetchAll();
+
+} elseif ($is_lead) {
+    // Team members (interns only)
+    $interns = $pdo->prepare('
+        SELECT u.id, u.name, p.reg_number
+        FROM team_members tm
+        JOIN users u ON u.id = tm.user_id AND u.role = "intern"
+        LEFT JOIN profiles p ON p.user_id = u.id
+        WHERE tm.team_id = ?
+        ORDER BY u.name
+    ');
     $interns->execute([$lead_team_id]);
     $interns = $interns->fetchAll();
-} else {
-    // All interns for admin/management
-    $interns = $pdo->query('SELECT u.id, u.name, p.reg_number FROM users u LEFT JOIN profiles p ON p.user_id = u.id WHERE u.role = "intern" ORDER BY u.name')->fetchAll();
 }
 
-// Process form submission
+// ---------- PROCESS SUBMISSION ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title       = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $week        = (int)($_POST['week'] ?? 1);
     $due_date    = $_POST['due_date'] ?? '';
-    $max_marks   = $_POST['max_marks'] !== '' ? (int)$_POST['max_marks'] : null; // optional
-    $assign_type = $_POST['assign_type'] ?? 'individual'; // 'all_course' or 'individual'
+    $max_marks   = $_POST['max_marks'] !== '' ? (int)$_POST['max_marks'] : null;
+    $assign_type = $_POST['assign_type'] ?? 'all'; // 'all' or 'selected'
     $course_id   = $_POST['course_id'] ?? null;
     $selected_ids = $_POST['student_ids'] ?? [];
 
-    // Validate
     $errors = [];
-    if (empty($title)) $errors[] = 'Title is required.';
-    if (empty($due_date)) $errors[] = 'Due date is required.';
-    if ($assign_type === 'all_course' && empty($course_id)) {
-        $errors[] = 'Please select a course.';
-    }
-    if ($assign_type === 'individual' && empty($selected_ids)) {
-        $errors[] = 'Please select at least one student.';
+    if (empty($title))       $errors[] = 'Title is required.';
+    if (empty($due_date))    $errors[] = 'Due date is required.';
+
+    if ($assign_type === 'selected') {
+        if ($is_lead) {
+            if (empty($selected_ids)) $errors[] = 'Please select at least one team member.';
+        } else {
+            if (empty($course_id))    $errors[] = 'Please select a course first.';
+            if (empty($selected_ids)) $errors[] = 'Please select at least one student from the course.';
+        }
     }
 
     if (empty($errors)) {
         $groupRef = uniqid('asgn_', true);
         $insertStmt = $pdo->prepare('INSERT INTO assignments (user_id, group_ref, title, week, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, "not_started")');
 
-        if ($assign_type === 'all_course') {
-            // Get all interns enrolled in that course
-            $enrolled = $pdo->prepare('SELECT user_id FROM enrollments WHERE course_id = ? AND status = "approved"');
-            $enrolled->execute([$course_id]);
-            $studentIds = $enrolled->fetchAll(PDO::FETCH_COLUMN);
+        if ($assign_type === 'all') {
+            // All applicable students
+            if ($is_lead) {
+                // All team members
+                $studentIds = array_column($interns, 'id');
+            } else {
+                // All approved interns (any course)
+                $studentIds = array_column($interns_with_course, 'id');
+            }
         } else {
+            // Selected students
             $studentIds = array_map('intval', $selected_ids);
-        }
-
-        // Ensure only valid interns (based on role/team restrictions) are assigned
-        if ($is_lead) {
-            $allowedIds = array_column($interns, 'id');
-            $studentIds = array_intersect($studentIds, $allowedIds);
+            // Additional safety: ensure they belong to the allowed set
+            if ($is_lead) {
+                $allowedIds = array_column($interns, 'id');
+                $studentIds = array_intersect($studentIds, $allowedIds);
+            } else {
+                // Only allow students from the chosen course
+                $allowedIds = [];
+                foreach ($interns_with_course as $ic) {
+                    if ($ic['course_id'] == $course_id) {
+                        $allowedIds[] = $ic['id'];
+                    }
+                }
+                $studentIds = array_intersect($studentIds, $allowedIds);
+            }
         }
 
         $pdo->beginTransaction();
@@ -122,6 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 
     <form method="post" class="glass card-pad mt-3">
+        <!-- Assignment details -->
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="form-label">Assignment Title <span class="text-danger">*</span></label>
@@ -148,50 +179,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <hr class="my-4">
         <h5 class="serif">Assign To</h5>
 
-        <?php if (!$is_lead): // super_admin / management can choose course or individuals ?>
+        <!-- Radio buttons -->
         <div class="mb-3">
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="assign_type" id="type_course" value="all_course" checked>
-                <label class="form-check-label" for="type_course">All students in a course</label>
+                <input class="form-check-input" type="radio" name="assign_type" id="type_all" value="all" checked>
+                <label class="form-check-label" for="type_all">
+                    <?= $is_lead ? 'All team members' : 'All students' ?>
+                </label>
             </div>
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="assign_type" id="type_individual" value="individual">
-                <label class="form-check-label" for="type_individual">Selected students</label>
+                <input class="form-check-input" type="radio" name="assign_type" id="type_selected" value="selected">
+                <label class="form-check-label" for="type_selected">
+                    <?= $is_lead ? 'Selected members' : 'Selected students' ?>
+                </label>
             </div>
         </div>
-        <?php else: ?>
-        <input type="hidden" name="assign_type" value="individual">
-        <p>Select team members to assign this task to:</p>
-        <?php endif; ?>
 
-        <!-- Course dropdown (visible when course type is selected) -->
-        <div id="courseSelectDiv" class="mb-3" style="<?= $is_lead ? 'display:none' : '' ?>">
-            <label class="form-label">Course</label>
+        <!-- Course dropdown (only for admin/management, visible only when 'selected' is chosen) -->
+        <?php if (!$is_lead): ?>
+        <div id="courseSelectDiv" class="mb-3" style="display:none;">
+            <label class="form-label">Course <span class="text-danger">*</span></label>
             <select class="form-select" name="course_id" id="courseSelect">
                 <option value="">-- Select Course --</option>
                 <?php foreach ($courses as $c): ?>
                     <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
                 <?php endforeach; ?>
             </select>
-            <small class="text-muted">This will assign to all approved interns in the selected course.</small>
         </div>
+        <?php endif; ?>
 
-        <!-- Student multi-select (visible when individual type is selected) -->
-        <div id="studentsDiv" class="mb-3" style="<?= $is_lead ? '' : 'display:none' ?>">
-            <label class="form-label">Students</label>
+        <!-- Student checkboxes -->
+        <div id="studentsDiv" class="mb-3" style="<?= $is_lead ? 'display:block' : 'display:none' ?>">
+            <label class="form-label">Select students</label>
             <div class="border rounded p-2" style="max-height:300px; overflow-y:auto; background:rgba(255,255,255,0.05);">
-                <?php if (empty($interns)): ?>
-                    <p class="text-muted">No interns available.</p>
+                <?php if ($is_lead): ?>
+                    <!-- Lead: team members list, always visible -->
+                    <?php if (empty($interns)): ?>
+                        <p class="text-muted">No team members found.</p>
+                    <?php else: ?>
+                        <?php foreach ($interns as $intern): ?>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="student_ids[]" value="<?= $intern['id'] ?>">
+                                <label class="form-check-label">
+                                    <?= e($intern['name']) ?> 
+                                    <?php if (!empty($intern['reg_number'])): ?>(<?= e($intern['reg_number']) ?>)<?php endif; ?>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <?php foreach ($interns as $intern): ?>
-                        <div class="form-check">
-                            <input class="form-check-input student-checkbox" type="checkbox" name="student_ids[]" value="<?= $intern['id'] ?>">
-                            <label class="form-check-label">
-                                <?= e($intern['name']) ?> 
-                                <?php if (!empty($intern['reg_number'])): ?>(<?= e($intern['reg_number']) ?>)<?php endif; ?>
-                            </label>
-                        </div>
-                    <?php endforeach; ?>
+                    <!-- Admin/Management: all interns, filtered by course via JS -->
+                    <?php if (empty($interns_with_course)): ?>
+                        <p class="text-muted">No interns with approved enrollment found.</p>
+                    <?php else: ?>
+                        <?php foreach ($interns_with_course as $intern): ?>
+                            <div class="form-check student-check" data-course="<?= $intern['course_id'] ?>" style="display:none;">
+                                <input class="form-check-input" type="checkbox" name="student_ids[]" value="<?= $intern['id'] ?>">
+                                <label class="form-check-label">
+                                    <?= e($intern['name']) ?> 
+                                    <?php if (!empty($intern['reg_number'])): ?>(<?= e($intern['reg_number']) ?>)<?php endif; ?>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -204,30 +254,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-// Toggle visibility based on assignment type
 document.addEventListener('DOMContentLoaded', function() {
-    const typeCourse = document.getElementById('type_course');
-    const typeIndiv = document.getElementById('type_individual');
+    const typeAll = document.getElementById('type_all');
+    const typeSelected = document.getElementById('type_selected');
     const courseDiv = document.getElementById('courseSelectDiv');
     const studentsDiv = document.getElementById('studentsDiv');
     const courseSelect = document.getElementById('courseSelect');
 
-    function toggle() {
-        if (!typeCourse || !typeIndiv) return; // mentor mode has only individual
-        if (typeIndiv.checked) {
-            courseDiv.style.display = 'none';
-            studentsDiv.style.display = 'block';
-        } else {
-            courseDiv.style.display = 'block';
-            studentsDiv.style.display = 'none';
+    // For admin/management only
+    if (courseDiv && studentsDiv) {
+        // Show/hide course & student list based on radio selection
+        function togglePanels() {
+            if (typeSelected.checked) {
+                courseDiv.style.display = 'block';
+                studentsDiv.style.display = 'block';
+                filterStudents(); // apply filter immediately
+            } else {
+                courseDiv.style.display = 'none';
+                studentsDiv.style.display = 'none'; // hide all student checkboxes
+                // uncheck all
+                document.querySelectorAll('.student-check input').forEach(cb => cb.checked = false);
+            }
         }
+
+        typeAll.addEventListener('change', togglePanels);
+        typeSelected.addEventListener('change', togglePanels);
+        if (courseSelect) {
+            courseSelect.addEventListener('change', filterStudents);
+        }
+
+        function filterStudents() {
+            const selectedCourse = courseSelect ? courseSelect.value : '';
+            const checks = document.querySelectorAll('.student-check');
+            checks.forEach(el => {
+                if (selectedCourse === '' || el.getAttribute('data-course') !== selectedCourse) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                }
+            });
+        }
+
+        // Initial state: if "All" is checked (default), hide course & students
+        togglePanels();
     }
 
-    if (typeCourse && typeIndiv) {
-        typeCourse.addEventListener('change', toggle);
-        typeIndiv.addEventListener('change', toggle);
-        toggle(); // initial state
-    }
+    // For leads: no special toggling needed (studentsDiv always visible, courseDiv absent)
 });
 </script>
 
