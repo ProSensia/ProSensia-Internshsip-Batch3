@@ -11,17 +11,18 @@ $fc = $pdo->prepare('SELECT * FROM form_c WHERE user_id = ?');
 $fc->execute([$uid]);
 $f = $fc->fetch();
 
-// Normalize and check status
-$status = isset($f['status']) ? strtolower(trim($f['status'])) : null;
-
-if (!$f || !in_array($status, ['submitted', 'approved'])) {
-    $msg = 'Please submit Form C first. Your form must be submitted or approved to download the admit card.';
-    if ($status) $msg .= " Current status: '$status'.";
-    flash($msg, 'warning');
+if (!$f) {
+    flash('No Form C record found. Please submit Form C first.', 'warning');
     header('Location: ' . base_url('intern/formc.php'));
     exit;
 }
 
+$status = strtolower(trim($f['status']));
+if (!in_array($status, ['submitted', 'approved'])) {
+    flash('Your Form C status is "' . $status . '". Only submitted or approved forms can download the admit card.', 'warning');
+    header('Location: ' . base_url('intern/formc.php'));
+    exit;
+}
 // Get student profile
 $prof = $pdo->prepare('SELECT * FROM profiles WHERE user_id = ?');
 $prof->execute([$uid]);
