@@ -4,6 +4,57 @@ require __DIR__ . '/../includes/header.php';
 require_login();
 $uid = (int)$user['id'];
 
+if (in_array($role, ['super_admin', 'management'])) {
+    // Show all teams and their kanban cards
+    $teams = $pdo->query('SELECT * FROM teams ORDER BY name')->fetchAll();
+    ?>
+    <h1 class="serif" style="font-size:34px">Team Boards Overview</h1>
+    <p class="muted">View and manage all team kanban boards.</p>
+    <?php foreach ($teams as $team): 
+        $cards = $pdo->prepare('SELECT * FROM kanban_cards WHERE team_id = ? ORDER BY status, position');
+        $cards->execute([$team['id']]);
+        $by = ['todo'=>[], 'in_progress'=>[], 'done'=>[]];
+        foreach ($cards as $c) { $by[$c['status']][] = $c; }
+    ?>
+        <div class="glass card-pad mt-3">
+            <h3 class="serif"><?= e($team['name']) ?></h3>
+            <div class="kanban" style="display:flex; gap:1rem; overflow-x:auto;">
+                <?php foreach (['todo'=>'To Do','in_progress'=>'In Progress','done'=>'Done'] as $k=>$label): ?>
+                <div style="flex:1; min-width:250px;">
+                    <div class="kanban-col-head"><strong><?= $label ?></strong> <span class="badge"><?= count($by[$k]) ?></span></div>
+                    <?php foreach ($by[$k] as $card): ?>
+                        <div class="kanban-card" style="background:#2a2a2a; padding:8px; margin-bottom:8px; border-radius:8px;">
+                            <div><strong><?= e($card['title']) ?></strong></div>
+                            <div class="small muted"><?= e($card['description']) ?></div>
+                            <?php if ($card['field']): ?><span class="badge b-info"><?= e($card['field']) ?></span><?php endif; ?>
+                            <div class="mt-1"><a href="#" data-bs-toggle="modal" data-bs-target="#cardModal<?= $card['id'] ?>" class="small">View details</a></div>
+                        </div>
+                        <!-- Modal -->
+                        <div class="modal fade" id="cardModal<?= $card['id'] ?>" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-scrollable">
+                                <div class="modal-content bg-dark text-light">
+                                    <div class="modal-header"><h5><?= e($card['title']) ?></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                                    <div class="modal-body">
+                                        <p><strong>Description:</strong><br><?= nl2br(e($card['description'])) ?></p>
+                                        <p><strong>Field:</strong> <?= e($card['field']) ?></p>
+                                        <p><strong>Due Date:</strong> <?= e($card['due_date']) ?></p>
+                                        <p><strong>Status:</strong> <?= e($card['status']) ?></p>
+                                        <p><strong>Created By:</strong> <?= e($card['created_by']) ?></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endforeach;
+    require __DIR__ . '/../includes/footer.php';
+    exit;
+}
+
+
 // Create new card
 if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='new') {
   $title = trim($_POST['title'] ?? '');

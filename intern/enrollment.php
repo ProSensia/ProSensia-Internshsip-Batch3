@@ -1,79 +1,179 @@
 <?php
-$page_title='Enrollment'; $page_section='Workspace'; $page_label='Enrollment';
+$page_title = 'Enrollment';
+$page_section = 'Workspace';
+$page_label = 'Enrollment';
 require __DIR__ . '/../includes/header.php';
-require_role(['intern','super_admin','management']);
+require_role(['intern', 'super_admin', 'management']);
 
 $uid = $user['id'];
-if ($_SERVER['REQUEST_METHOD']==='POST' && $user['role']==='intern') {
-    $exists = $pdo->prepare('SELECT id FROM enrollments WHERE user_id=?'); $exists->execute([$uid]);
-    $row = $exists->fetch();
-    if ($row) {
-      $pdo->prepare('UPDATE enrollments SET track=?,batch=?,start_date=?,payment_plan=?,agreed=?,status=?,submitted_at=NOW() WHERE id=?')
-          ->execute([$_POST['track'],$_POST['batch'],$_POST['start_date'],$_POST['payment_plan'],isset($_POST['agreed'])?1:0,'submitted',$row['id']]);
+$role = $user['role'];
+
+// Define available courses
+$courses = [
+    'Full Stack Web Development',
+    'AI & Machine Learning',
+    'Python Development',
+    'Cyber Security',
+    'Software Testing / QA',
+    'Graphic Designing',
+    'C++ Programming',
+    'Data Science',
+    'Cloud Computing'
+];
+
+// Define batches
+$batches = ['Batch 1 (Spring 2025)', 'Batch 2 (Summer 2025)', 'Batch 3 (Fall 2025)', 'Batch 4 (Winter 2026)'];
+
+// Process enrollment submission (only for interns)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $role === 'intern') {
+    $track = $_POST['track'] ?? '';
+    $batch = $_POST['batch'] ?? '';
+    $start_date = $_POST['start_date'] ?? null;
+    $payment_plan = $_POST['payment_plan'] ?? 'monthly';
+    $agreed = isset($_POST['agreed']) ? 1 : 0;
+
+    $errors = [];
+    if (!$track) $errors[] = 'Please select a course.';
+    if (!$batch) $errors[] = 'Please select a batch.';
+    if (!$agreed) $errors[] = 'You must agree to the terms.';
+
+    if (empty($errors)) {
+        $stmt = $pdo->prepare('SELECT id FROM enrollments WHERE user_id = ?');
+        $stmt->execute([$uid]);
+        if ($stmt->fetch()) {
+            $upd = $pdo->prepare('UPDATE enrollments SET track=?, batch=?, start_date=?, payment_plan=?, agreed=?, status="submitted", submitted_at=NOW() WHERE user_id=?');
+            $upd->execute([$track, $batch, $start_date, $payment_plan, $agreed, $uid]);
+        } else {
+            $ins = $pdo->prepare('INSERT INTO enrollments (user_id, track, batch, start_date, payment_plan, agreed, status, submitted_at) VALUES (?,?,?,?,?,?,"submitted",NOW())');
+            $ins->execute([$uid, $track, $batch, $start_date, $payment_plan, $agreed]);
+        }
+        flash('Enrollment submitted. Awaiting admin approval.', 'success');
+        header('Location: ' . base_url('intern/enrollment.php'));
+        exit;
     } else {
-      $pdo->prepare('INSERT INTO enrollments(user_id,track,batch,start_date,payment_plan,agreed,status,submitted_at) VALUES(?,?,?,?,?,?,?,NOW())')
-          ->execute([$uid,$_POST['track'],$_POST['batch'],$_POST['start_date'],$_POST['payment_plan'],isset($_POST['agreed'])?1:0,'submitted']);
+        flash(implode('<br>', $errors), 'danger');
     }
-    flash('Enrollment submitted.');
-    header('Location: '.base_url('intern/enrollment.php')); exit;
 }
-$e = $pdo->prepare('SELECT * FROM enrollments WHERE user_id=? ORDER BY id DESC LIMIT 1'); $e->execute([$uid]); $enr = $e->fetch() ?: [];
-?>
-<h1 class="serif" style="font-size:38px">Enrollment</h1>
-<p class="muted">Choose your track and confirm onboarding details.</p>
 
-<div class="row g-4">
-<div class="col-lg-7">
-<form method="post" class="glass card-pad">
-  <div class="row g-3">
-    <div class="col-md-8"><label class="form-label">Track</label>
-      <select class="form-select" name="track" required>
-        <?php foreach(['Full-Stack Web Development','Data Science & AI','Mobile App Development','UI/UX Design','Cybersecurity'] as $t): ?>
-          <option <?= ($enr['track'] ?? '')===$t?'selected':'' ?>><?= $t ?></option>
-        <?php endforeach; ?>
-      </select>
+// For admin/management: show all enrollments
+if (in_array($role, ['super_admin', 'management'])) {
+    $enrollments = $pdo->query('
+        SELECT e.*, u.name, u.email, p.reg_number 
+        FROM enrollments e 
+        JOIN users u ON u.id = e.user_id 
+        LEFT JOIN profiles p ON p.user_id = u.id 
+        ORDER BY e.submitted_at DESC
+    ')->fetchAll();
+    ?>
+    <h1 class="serif" style="font-size:34px">Enrollment Requests</h1>
+    <p class="muted">Review and manage intern enrollment applications.</p>
+    <div class="glass card-pad">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr><th>Name</th><th>Reg #</th><th>Course</th><th>Batch</th><th>Start Date</th><th>Plan</th><th>Status</th><th>Submitted</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($enrollments as $e): ?>
+                    <tr>
+                        <td><?= e($e['name']) ?></td>
+                        <td><?= e($e['reg_number'] ?? '—') ?></td>
+                        <td><?= e($e['track']) ?></td>
+                        <td><?= e($e['batch']) ?></td>
+                        <td><?= e($e['start_date']) ?></td>
+                        <td><?= e($e['payment_plan']) ?></td>
+                        <td><span class="badge <?= $e['status'] === 'approved' ? 'b-success' : ($e['status'] === 'rejected' ? 'b-danger' : 'b-warning') ?>"><?= ucfirst($e['status']) ?></span></td>
+                        <td><?= date('d M Y', strtotime($e['submitted_at'])) ?></td>
+                        <td>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="update_enrollment">
+                                <input type="hidden" name="id" value="<?= $e['id'] ?>">
+                                <select name="status" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                                    <option value="submitted" <?= $e['status'] === 'submitted' ? 'selected' : '' ?>>Pending</option>
+                                    <option value="approved" <?= $e['status'] === 'approved' ? 'selected' : '' ?>>Approve</option>
+                                    <option value="rejected" <?= $e['status'] === 'rejected' ? 'selected' : '' ?>>Reject</option>
+                                </select>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
-    <div class="col-md-4"><label class="form-label">Batch</label>
-      <select class="form-select" name="batch">
-        <?php foreach(['Batch 3 (Summer 2026)','Batch 4 (Fall 2026)'] as $b): ?>
-          <option <?= ($enr['batch'] ?? '')===$b?'selected':'' ?>><?= $b ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="col-md-6"><label class="form-label">Start date</label><input class="form-control" type="date" name="start_date" value="<?= e($enr['start_date'] ?? date('Y-m-d')) ?>"></div>
-    <div class="col-md-6"><label class="form-label">Payment plan</label>
-      <select class="form-select" name="payment_plan">
-        <option value="monthly" <?= ($enr['payment_plan'] ?? '')==='monthly'?'selected':'' ?>>Monthly</option>
-        <option value="full" <?= ($enr['payment_plan'] ?? '')==='full'?'selected':'' ?>>Pay in full</option>
-      </select>
-    </div>
-    <div class="col-12 form-check ms-2 mt-3">
-      <input class="form-check-input" type="checkbox" name="agreed" id="agreed" <?= !empty($enr['agreed'])?'checked':'' ?>>
-      <label class="form-check-label muted" for="agreed">I agree to the ProSensia internship code of conduct.</label>
-    </div>
-  </div>
-  <div class="mt-4">
-    <?php if ($user['role']==='intern'): ?>
-      <button class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit enrollment</button>
-    <?php else: ?>
-      <span class="muted">Read-only view (admin/management).</span>
+    <?php
+    // Handle status update
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_enrollment') {
+        $id = (int)$_POST['id'];
+        $status = $_POST['status'];
+        $pdo->prepare('UPDATE enrollments SET status = ? WHERE id = ?')->execute([$status, $id]);
+        flash('Enrollment status updated.', 'info');
+        header('Location: ' . base_url('intern/enrollment.php'));
+        exit;
+    }
+} else {
+    // Intern view: show enrollment form and current status
+    $stmt = $pdo->prepare('SELECT * FROM enrollments WHERE user_id = ?');
+    $stmt->execute([$uid]);
+    $enroll = $stmt->fetch();
+    $status = $enroll['status'] ?? 'draft';
+    ?>
+    <h1 class="serif" style="font-size:34px">Internship Enrollment</h1>
+    <p class="muted">Select your desired course and batch. Once approved, you will gain access to the full portal.</p>
+
+    <?php if ($status === 'approved'): ?>
+        <div class="alert alert-success">Your enrollment has been approved! You are now officially enrolled.</div>
+    <?php elseif ($status === 'submitted'): ?>
+        <div class="alert alert-info">Your enrollment request is under review. We'll notify you once approved.</div>
+    <?php elseif ($status === 'rejected' && !empty($enroll['reviewer_note'])): ?>
+        <div class="alert alert-danger">Your enrollment was rejected: <?= e($enroll['reviewer_note']) ?></div>
     <?php endif; ?>
-  </div>
-</form>
-</div>
 
-<div class="col-lg-5">
-  <div class="glass card-pad">
-    <h4 class="serif">Status</h4>
-    <p class="muted mb-3">Your current application state.</p>
-    <span class="badge <?= ($enr['status'] ?? '')==='approved'?'b-success':(($enr['status'] ?? '')==='submitted'?'b-warning':'b-muted') ?>"><?= e(ucfirst($enr['status'] ?? 'draft')) ?></span>
-    <ul class="checklist mt-4 p-0">
-      <li><span class="dot <?= !empty($enr) ? 'green':'amber' ?>"></span> Application started</li>
-      <li><span class="dot <?= ($enr['status'] ?? '')!=='draft' ? 'green':'amber' ?>"></span> Submitted to review</li>
-      <li><span class="dot <?= ($enr['status'] ?? '')==='approved' ? 'green':'amber' ?>"></span> Approved by admin</li>
-    </ul>
-  </div>
-</div>
-</div>
-
-<?php require __DIR__ . '/../includes/footer.php'; ?>
+    <?php if ($status !== 'approved'): ?>
+        <form method="post" class="glass card-pad mt-3">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Select Course <span class="text-danger">*</span></label>
+                    <select class="form-select" name="track" required>
+                        <option value="">-- Choose --</option>
+                        <?php foreach ($courses as $c): ?>
+                            <option value="<?= e($c) ?>" <?= ($enroll['track'] ?? '') === $c ? 'selected' : '' ?>><?= e($c) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Select Batch <span class="text-danger">*</span></label>
+                    <select class="form-select" name="batch" required>
+                        <option value="">-- Choose --</option>
+                        <?php foreach ($batches as $b): ?>
+                            <option value="<?= e($b) ?>" <?= ($enroll['batch'] ?? '') === $b ? 'selected' : '' ?>><?= e($b) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Preferred Start Date</label>
+                    <input type="date" class="form-control" name="start_date" value="<?= e($enroll['start_date'] ?? '') ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Payment Plan</label>
+                    <select class="form-select" name="payment_plan">
+                        <option value="monthly" <?= ($enroll['payment_plan'] ?? '') === 'monthly' ? 'selected' : '' ?>>Monthly</option>
+                        <option value="full" <?= ($enroll['payment_plan'] ?? '') === 'full' ? 'selected' : '' ?>>Full (Discount)</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="agreed" id="agreed" required <?= ($enroll['agreed'] ?? 0) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="agreed">I confirm that the information provided is correct and I agree to the terms and conditions. <span class="text-danger">*</span></label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Submit Enrollment</button>
+            </div>
+        </form>
+    <?php endif; ?>
+    <?php
+}
+require __DIR__ . '/../includes/footer.php';
+?>
