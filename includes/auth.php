@@ -1,7 +1,7 @@
 <?php
 
 date_default_timezone_set('Asia/Karachi'); 
-$pdo->exec("SET time_zone = '+05:00'");
+// $pdo->exec("SET time_zone = '+05:00'");
 // includes/auth.php — session bootstrap + role guard + helpers.
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/connection.php';
