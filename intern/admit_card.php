@@ -4,7 +4,14 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 require_once __DIR__ . '/../lib/fpdf.php';
 
-$uid = $user['id'];
+$currentUser = current_user();
+
+if (!$currentUser) {
+    die('Unable to load current user.');
+}
+
+$uid = (int)$currentUser['id'];
+$user = $currentUser; // keep existing code working
 
 echo "<pre>";
 var_dump($user);
