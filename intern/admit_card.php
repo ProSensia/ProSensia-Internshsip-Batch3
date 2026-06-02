@@ -13,7 +13,7 @@ $currentUser = current_user();
 if (!$currentUser || empty($currentUser['id'])) {
     die('Unable to load current user.');
 }
-$uid = (int) $currentUser['id'];
+$uid = (int)$currentUser['id'];
 $user = $currentUser;
 
 /*
@@ -29,7 +29,7 @@ if (!$f) {
     die('No Form C record found. Please submit Form C first. User ID: ' . $uid);
 }
 
-$status = strtolower(trim((string) $f['status']));
+$status = strtolower(trim((string)$f['status']));
 if (!in_array($status, ['submitted', 'approved'], true)) {
     die('Form C not eligible. Current status: ' . $status);
 }
@@ -63,37 +63,46 @@ $host = $_SERVER['HTTP_HOST'];
 $verifyUrl = $protocol . '://' . $host . '/verify_admit.php?uid=' . $uid;
 
 $tempDir = __DIR__ . '/../temp';
-if (!is_dir($tempDir))
+if (!is_dir($tempDir)) {
     mkdir($tempDir, 0777, true);
+}
 $qrTempFile = $tempDir . '/qr_admit_' . uniqid() . '.png';
 $qrData = @file_get_contents('https://quickchart.io/qr?text=' . urlencode($verifyUrl) . '&size=150&margin=2');
 $qrOk = ($qrData && file_put_contents($qrTempFile, $qrData)) ? true : false;
 
 /*
 |--------------------------------------------------------------------------
-| Logo Handling (same as before, convert webp if needed)
+| Logo Handling — prefer the black logo for PDF, fallback to DB setting
 |--------------------------------------------------------------------------
 */
 $proSensiaLogo = null;
-$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
-$stmt->execute();
-$logoPath = $stmt->fetchColumn();
-if ($logoPath) {
-    $full = __DIR__ . '/../' . ltrim($logoPath, '/');
-    if (file_exists($full)) {
-        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
-        if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
-            $tempPng = $tempDir . '/logo_ps_' . uniqid() . '.png';
-            $img = imagecreatefromwebp($full);
-            if ($img) {
-                imagepng($img, $tempPng);
-                imagedestroy($img);
-                $proSensiaLogo = $tempPng;
-                register_shutdown_function(function () use ($tempPng) {
-                    @unlink($tempPng); });
+$blackLogoPath = __DIR__ . '/../assets/images/prosensia-logo-black.png';
+
+if (file_exists($blackLogoPath)) {
+    $proSensiaLogo = $blackLogoPath;   // use the black PNG directly
+} else {
+    // fallback: use logo from DB settings (the original logic)
+    $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
+    $stmt->execute();
+    $logoPath = $stmt->fetchColumn();
+    if ($logoPath) {
+        $full = __DIR__ . '/../' . ltrim($logoPath, '/');
+        if (file_exists($full)) {
+            $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+            if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
+                $tempPng = $tempDir . '/logo_ps_' . uniqid() . '.png';
+                $img = imagecreatefromwebp($full);
+                if ($img) {
+                    imagepng($img, $tempPng);
+                    imagedestroy($img);
+                    $proSensiaLogo = $tempPng;
+                    register_shutdown_function(function () use ($tempPng) {
+                        @unlink($tempPng);
+                    });
+                }
+            } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) {
+                $proSensiaLogo = $full;
             }
-        } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) {
-            $proSensiaLogo = $full;
         }
     }
 }
@@ -110,9 +119,7 @@ class AdmitCardPDF extends FPDF
     public $dark = [40, 40, 40];
     public $bg = [255, 253, 248];
 
-    function Header()
-    {
-    }
+    function Header() {}
 
     function Footer()
     {
@@ -221,14 +228,14 @@ $y = $pdf->GetY() + 2;
 $infoX = 15;
 $infoW = 130;
 
-$pdf->InfoRow('Student Name', $user['name'], $infoX, $infoW, $y);
-$pdf->InfoRow('Father Name', $profile['father_name'] ?? '', $infoX, $infoW, $y);
+$pdf->InfoRow('Student Name',   $user['name'], $infoX, $infoW, $y);
+$pdf->InfoRow('Father Name',    $profile['father_name'] ?? '', $infoX, $infoW, $y);
 $pdf->InfoRow('Registration #', $profile['reg_number'] ?? '', $infoX, $infoW, $y);
-$pdf->InfoRow('CNIC #', $profile['cnic'] ?? '', $infoX, $infoW, $y);
-$pdf->InfoRow('Department', $profile['department'] ?? 'Electrical and Computer Engineering', $infoX, $infoW, $y);
-$pdf->InfoRow('Semester', $profile['semester'] ?? '', $infoX, $infoW, $y);
-$pdf->InfoRow('Contact', $profile['phone'] ?? '', $infoX, $infoW, $y);
-$pdf->InfoRow('Email', $user['email'], $infoX, $infoW, $y);
+$pdf->InfoRow('CNIC #',         $profile['cnic'] ?? '', $infoX, $infoW, $y);
+$pdf->InfoRow('Department',     $profile['department'] ?? 'Electrical and Computer Engineering', $infoX, $infoW, $y);
+$pdf->InfoRow('Semester',       $profile['semester'] ?? '', $infoX, $infoW, $y);
+$pdf->InfoRow('Contact',        $profile['phone'] ?? '', $infoX, $infoW, $y);
+$pdf->InfoRow('Email',          $user['email'], $infoX, $infoW, $y);
 
 // --- Internship Certification Paragraph ---
 $y += 6;
@@ -250,9 +257,9 @@ $pdf->SetXY(15, $y);
 $pdf->SectionTitle('Internship Placement Details');
 $y = $pdf->GetY() + 2;
 
-$pdf->InfoRow('Employer Name', $f['employer_name'] ?? '', 15, 180, $y);
-$pdf->InfoRow('Department', $f['employer_dept'] ?? '', 15, 180, $y);
-$pdf->InfoRow('Joining Date', $f['joining_date'] ?? '', 15, 180, $y);
+$pdf->InfoRow('Employer Name',   $f['employer_name'] ?? '', 15, 180, $y);
+$pdf->InfoRow('Department',     $f['employer_dept'] ?? '', 15, 180, $y);
+$pdf->InfoRow('Joining Date',   $f['joining_date'] ?? '', 15, 180, $y);
 
 // --- QR Code & Verification ---
 $qrX = 15;
@@ -265,7 +272,8 @@ if ($qrOk && file_exists($qrTempFile)) {
     $pdf->Cell(22, 4, 'Scan to verify', 0, 1, 'C');
     $pdf->SetTextColor($pdf->dark[0], $pdf->dark[1], $pdf->dark[2]);
     register_shutdown_function(function () use ($qrTempFile) {
-        @unlink($qrTempFile); });
+        @unlink($qrTempFile);
+    });
 }
 
 // --- Signature Area ---

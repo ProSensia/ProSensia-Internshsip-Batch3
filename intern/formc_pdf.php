@@ -34,31 +34,38 @@ $qrData = @file_get_contents('https://quickchart.io/qr?text=' . urlencode($verif
 if ($qrData && file_put_contents($qrTempFile, $qrData)) $qrOk = true;
 else $qrOk = false;
 
-// ProSensia logo
+// ProSensia logo – prefer black version
 $proSensiaLogo = null;
-$stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
-$stmt->execute();
-$logoPath = $stmt->fetchColumn();
-if ($logoPath) {
-    $full = __DIR__ . '/../' . ltrim($logoPath, '/');
-    if (file_exists($full)) {
-        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
-        if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
-            $tempPng = $tempDir . '/logo_ps_' . uniqid() . '.png';
-            $img = imagecreatefromwebp($full);
-            if ($img) {
-                imagepng($img, $tempPng);
-                imagedestroy($img);
-                $proSensiaLogo = $tempPng;
-                register_shutdown_function(function() use ($tempPng) { @unlink($tempPng); });
+$blackLogoPath = __DIR__ . '/../assets/images/prosensia-logo-black.png';
+
+if (file_exists($blackLogoPath)) {
+    $proSensiaLogo = $blackLogoPath;
+} else {
+    // fallback to DB setting
+    $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'logo_path'");
+    $stmt->execute();
+    $logoPath = $stmt->fetchColumn();
+    if ($logoPath) {
+        $full = __DIR__ . '/../' . ltrim($logoPath, '/');
+        if (file_exists($full)) {
+            $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+            if ($ext === 'webp' && function_exists('imagecreatefromwebp')) {
+                $tempPng = $tempDir . '/logo_ps_' . uniqid() . '.png';
+                $img = imagecreatefromwebp($full);
+                if ($img) {
+                    imagepng($img, $tempPng);
+                    imagedestroy($img);
+                    $proSensiaLogo = $tempPng;
+                    register_shutdown_function(function() use ($tempPng) { @unlink($tempPng); });
+                }
+            } elseif (in_array($ext, ['jpg','jpeg','png','gif'])) {
+                $proSensiaLogo = $full;
             }
-        } elseif (in_array($ext, ['jpg','jpeg','png','gif'])) {
-            $proSensiaLogo = $full;
         }
     }
 }
 
-// Partner logo (small)
+// Partner logo (small) – unchanged
 $partnerLogo = null;
 $stmt = $pdo->prepare("SELECT v FROM settings WHERE k = 'partner_logo_path'");
 $stmt->execute();
@@ -98,7 +105,6 @@ $pdf->SetMargins(15,15,15);
 $pdf->AddPage();
 $pdf->SetFont('Helvetica','',10);
 
-// Disable auto page break to force one page (we'll manually ensure content fits)
 $pdf->SetAutoPageBreak(false);
 
 // ----- Top row: ProSensia logo with background + Reference -----
@@ -106,8 +112,6 @@ $logoX = 15;
 $logoY = 10;
 $logoWidth = 30;
 $logoHeight = 18;
-// $pdf->SetFillColor(240,240,240);
-// $pdf->Rect($logoX-2, $logoY-2, $logoWidth+4, $logoHeight+4, 'F');
 if ($proSensiaLogo) $pdf->Image($proSensiaLogo, $logoX, $logoY, $logoWidth);
 else { $pdf->SetXY($logoX, $logoY); $pdf->SetFont('Helvetica','B',10); $pdf->Cell($logoWidth, $logoHeight, 'ProSensia',0,0,'C'); }
 
@@ -118,8 +122,8 @@ $pdf->Cell(45,8,'Ref: ' . $refNumber,0,1,'R');
 
 // ----- Second row: Partner logo (small) + University header -----
 $partnerY = 32;
-$partnerW = 25;  // smaller width
-$partnerH = 18;  // smaller height
+$partnerW = 25;
+$partnerH = 18;
 if ($partnerLogo) {
     $pdf->Image($partnerLogo, 15, $partnerY, $partnerW);
     $textX = 15 + $partnerW + 6;
@@ -177,7 +181,6 @@ $pdf->Cell(48,$h,$student['semester']?:'_________________________',0,1);
 
 $y=$pdf->GetY();
 $pdf->SetXY($left,$y); $pdf->Cell(32,$h,'Present Address:',0,0);
-// Use Cell instead of MultiCell to avoid page break
 $address = $student['address'] ?: '_________________________';
 $pdf->Cell(158,$h,$address,0,1);
 $pdf->Ln(2);
@@ -238,6 +241,4 @@ $pdf->Cell(70,4,'(Digital signature on file)',0,0,'C');
 $pdf->SetXY(120,$y+7);
 $pdf->Cell(70,4,'(Digital signature on file)',0,1,'C');
 
-// Ensure one page – if content exceeds, we'll shrink further, but likely fits now
 $pdf->Output('I', 'FormC_'.preg_replace('/[^A-Za-z0-9_-]/','_',$student['name']).'.pdf');
-?>
