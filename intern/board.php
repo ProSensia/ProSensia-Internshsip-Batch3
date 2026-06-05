@@ -4,13 +4,13 @@ require __DIR__ . '/../includes/header.php';
 require_login();
 $uid = (int)$user['id'];
 
-if (in_array($role, ['super_admin', 'management'])) {
-    // Show all teams and their kanban cards
+if ($role === 'super_admin') {
+    // Super admin: full read-only overview of all team boards
     $teams = $pdo->query('SELECT * FROM teams ORDER BY name')->fetchAll();
     ?>
     <h1 class="serif" style="font-size:34px">Team Boards Overview</h1>
-    <p class="muted">View and manage all team kanban boards.</p>
-    <?php foreach ($teams as $team): 
+    <p class="muted">View all team kanban boards. Use <a href="<?= base_url('shared/team_board.php') ?>">Team Board</a> to add/manage cards.</p>
+    <?php foreach ($teams as $team):
         $cards = $pdo->prepare('SELECT * FROM kanban_cards WHERE team_id = ? ORDER BY status, position');
         $cards->execute([$team['id']]);
         $by = ['todo'=>[], 'in_progress'=>[], 'done'=>[]];
@@ -25,11 +25,10 @@ if (in_array($role, ['super_admin', 'management'])) {
                     <?php foreach ($by[$k] as $card): ?>
                         <div class="kanban-card" style="background:#2a2a2a; padding:8px; margin-bottom:8px; border-radius:8px;">
                             <div><strong><?= e($card['title']) ?></strong></div>
-                            <div class="small muted"><?= e($card['description']) ?></div>
+                            <div class="small muted" style="white-space:pre-wrap"><?= nl2br(e($card['description'])) ?></div>
                             <?php if ($card['field']): ?><span class="badge b-info"><?= e($card['field']) ?></span><?php endif; ?>
                             <div class="mt-1"><a href="#" data-bs-toggle="modal" data-bs-target="#cardModal<?= $card['id'] ?>" class="small">View details</a></div>
                         </div>
-                        <!-- Modal -->
                         <div class="modal fade" id="cardModal<?= $card['id'] ?>" tabindex="-1">
                             <div class="modal-dialog modal-dialog-scrollable">
                                 <div class="modal-content bg-dark text-light">
@@ -39,7 +38,6 @@ if (in_array($role, ['super_admin', 'management'])) {
                                         <p><strong>Field:</strong> <?= e($card['field']) ?></p>
                                         <p><strong>Due Date:</strong> <?= e($card['due_date']) ?></p>
                                         <p><strong>Status:</strong> <?= e($card['status']) ?></p>
-                                        <p><strong>Created By:</strong> <?= e($card['created_by']) ?></p>
                                     </div>
                                 </div>
                             </div>
@@ -88,9 +86,33 @@ foreach ($cards as $c) { $by[$c['status']][] = $c; }
 
 $snaps = $pdo->prepare('SELECT * FROM kanban_snapshots WHERE user_id=? ORDER BY snapshot_date DESC LIMIT 10'); $snaps->execute([$uid]); $snaps=$snaps->fetchAll();
 ?>
+<?php if ($role === 'management'): ?>
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h1 class="serif mb-0" style="font-size:34px">My Board</h1>
+  <a href="<?= base_url('shared/team_board.php') ?>" class="btn btn-ghost btn-sm"><i class="bi bi-columns-gap me-1"></i>Team Boards Overview</a>
+</div>
+<div class="glass card-pad mb-4" style="border-left:3px solid var(--primary)">
+  <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-eye" style="color:var(--primary-glow)"></i><strong>All-Teams Snapshot</strong></div>
+  <?php
+    $mgmt_teams = $pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll();
+    foreach ($mgmt_teams as $mt):
+      $tc = $pdo->prepare('SELECT status,COUNT(*) c FROM kanban_cards WHERE team_id=? GROUP BY status'); $tc->execute([$mt['id']]); $counts=['todo'=>0,'in_progress'=>0,'done'=>0];
+      foreach($tc->fetchAll() as $row) $counts[$row['status']] = (int)$row['c'];
+  ?>
+  <div class="d-flex align-items-center gap-2 mb-1">
+    <span style="min-width:180px"><?= e($mt['name']) ?></span>
+    <span class="badge b-muted">Todo <?= $counts['todo'] ?></span>
+    <span class="badge b-info">In Progress <?= $counts['in_progress'] ?></span>
+    <span class="badge b-success" style="background:rgba(52,211,153,.15);color:#34d399">Done <?= $counts['done'] ?></span>
+    <a href="<?= base_url('shared/team_board.php?team='.(int)$mt['id']) ?>" class="btn btn-ghost btn-sm py-0 ms-auto"><i class="bi bi-arrow-right"></i></a>
+  </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div class="d-flex justify-content-between flex-wrap gap-2 align-items-end mb-3">
   <div>
-    <h1 class="serif" style="font-size:34px;margin:0">My Kanban Board</h1>
+    <h1 class="serif" style="font-size:<?= $role==='management'?'26px':'34px' ?>;margin:0">My Personal Kanban</h1>
     <p class="muted mb-0">Drag cards between columns. Save a daily report to version-control your day's progress.</p>
   </div>
   <form method="post" class="d-inline"><input type="hidden" name="action" value="snapshot"><button class="btn btn-primary"><i class="bi bi-camera me-1"></i>Save daily report</button></form>
@@ -109,7 +131,7 @@ $snaps = $pdo->prepare('SELECT * FROM kanban_snapshots WHERE user_id=? ORDER BY 
       </select>
     </div>
     <div class="col-md-2"><label class="form-label">Due</label><input type="date" class="form-control" name="due_date"></div>
-    <div class="col-md-3"><label class="form-label">Notes</label><input class="form-control" name="description"></div>
+    <div class="col-md-3"><label class="form-label">Notes</label><textarea class="form-control" name="description" rows="2" placeholder="Multi-line notes…"></textarea></div>
     <div class="col-12"><button class="btn btn-ghost"><i class="bi bi-plus-lg me-1"></i>Add card</button></div>
   </form>
 </div>
@@ -134,7 +156,7 @@ $snaps = $pdo->prepare('SELECT * FROM kanban_snapshots WHERE user_id=? ORDER BY 
               <button class="btn btn-sm btn-ghost p-0 muted" title="Delete"><i class="bi bi-x-lg"></i></button>
             </form>
           </div>
-          <?php if ($c['description']): ?><div class="muted small mt-1"><?= e($c['description']) ?></div><?php endif; ?>
+          <?php if ($c['description']): ?><div class="muted small mt-1" style="white-space:pre-wrap"><?= nl2br(e($c['description'])) ?></div><?php endif; ?>
           <div class="kanban-meta mt-2">
             <?php if ($c['field']): ?><span class="badge b-info"><?= e($c['field']) ?></span><?php endif; ?>
             <?php if ($c['due_date']): ?><span class="badge b-muted"><i class="bi bi-calendar3 me-1"></i><?= e(date('M j', strtotime($c['due_date']))) ?></span><?php endif; ?>

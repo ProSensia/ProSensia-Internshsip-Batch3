@@ -65,7 +65,7 @@ if ($team_id) {
       </select>
     </div>
     <div class="col-md-2"><label class="form-label">Due</label><input type="date" class="form-control" name="due_date"></div>
-    <div class="col-md-3"><label class="form-label">Notes</label><input class="form-control" name="description"></div>
+    <div class="col-md-3"><label class="form-label">Notes</label><textarea class="form-control" name="description" rows="2" placeholder="Multi-line notes…"></textarea></div>
     <div class="col-12"><button class="btn btn-ghost"><i class="bi bi-plus-lg me-1"></i>Add card</button></div>
   </form>
 </div>
@@ -90,7 +90,7 @@ if ($team_id) {
             </form>
             <?php endif; ?>
           </div>
-          <?php if ($c['description']): ?><div class="muted small mt-1"><?= e($c['description']) ?></div><?php endif; ?>
+          <?php if ($c['description']): ?><div class="muted small mt-1" style="white-space:pre-wrap"><?= nl2br(e($c['description'])) ?></div><?php endif; ?>
           <div class="kanban-meta mt-2">
             <?php if ($c['field']): ?><span class="badge b-info"><?= e($c['field']) ?></span><?php endif; ?>
             <?php if ($c['due_date']): ?><span class="badge b-muted"><i class="bi bi-calendar3 me-1"></i><?= e(date('M j', strtotime($c['due_date']))) ?></span><?php endif; ?>

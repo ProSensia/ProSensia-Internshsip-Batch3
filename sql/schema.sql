@@ -170,6 +170,8 @@ CREATE TABLE chat_messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   channel_key VARCHAR(120) NOT NULL,
   from_id INT NOT NULL, text TEXT NOT NULL,
+  attachment_path VARCHAR(255) NULL,
+  attachment_name VARCHAR(255) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX(channel_key)

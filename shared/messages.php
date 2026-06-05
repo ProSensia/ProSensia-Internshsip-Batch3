@@ -25,12 +25,30 @@ $active = $_GET['ch'] ?? $channels[0]['key'];
 
 // Send message
 if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='send') {
-    $ch = $_POST['channel'];
+    $ch  = $_POST['channel'];
     $can = true;
     if ($ch === 'channel:announcements' && $role !== 'super_admin') $can = false;
-    if ($can && trim($_POST['text']) !== '') {
-        $pdo->prepare('INSERT INTO chat_messages(channel_key,from_id,text) VALUES(?,?,?)')
-            ->execute([$ch,$uid,trim($_POST['text'])]);
+    if ($can) {
+        $text   = trim($_POST['text'] ?? '');
+        $att_path = null; $att_name = null;
+        // Handle file attachment
+        if (!empty($_FILES['attachment']['name']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+            $allowed = ['pdf','doc','docx','ppt','pptx','xls','xlsx','png','jpg','jpeg','gif','zip','txt'];
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, $allowed, true)) {
+                $dir = __DIR__ . '/../assets/uploads/messages/';
+                if (!is_dir($dir)) mkdir($dir, 0775, true);
+                $fname = time() . '_' . $uid . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($_FILES['attachment']['name']));
+                if (move_uploaded_file($_FILES['attachment']['tmp_name'], $dir . $fname)) {
+                    $att_path = 'assets/uploads/messages/' . $fname;
+                    $att_name = basename($_FILES['attachment']['name']);
+                }
+            }
+        }
+        if ($text !== '' || $att_path !== null) {
+            $pdo->prepare('INSERT INTO chat_messages(channel_key,from_id,text,attachment_path,attachment_name) VALUES(?,?,?,?,?)')
+                ->execute([$ch, $uid, $text ?: '', $att_path, $att_name]);
+        }
     }
     header('Location: '.base_url('shared/messages.php?ch='.urlencode($ch))); exit;
 }
@@ -60,16 +78,33 @@ $canPost = !($active==='channel:announcements' && $role!=='super_admin');
       <?php foreach($messages as $m): $mine = (int)$m['from_id']===$uid; ?>
         <div class="bubble <?= $mine?'me':'' ?>">
           <div class="who"><?= e($m['name']) ?> · <?= e(date('M j, H:i', strtotime($m['created_at']))) ?></div>
-          <div><?= nl2br(e($m['text'])) ?></div>
+          <?php if (trim($m['text']) !== ''): ?><div><?= nl2br(e($m['text'])) ?></div><?php endif; ?>
+          <?php if (!empty($m['attachment_path'])): ?>
+            <?php $ext2 = strtolower(pathinfo($m['attachment_path'], PATHINFO_EXTENSION));
+                  $img_exts = ['png','jpg','jpeg','gif'];
+            ?>
+            <?php if (in_array($ext2, $img_exts, true)): ?>
+              <div class="mt-1"><img src="<?= base_url(e($m['attachment_path'])) ?>" alt="<?= e($m['attachment_name']) ?>" style="max-width:260px;max-height:200px;border-radius:8px"></div>
+            <?php else: ?>
+              <div class="mt-1"><a href="<?= base_url(e($m['attachment_path'])) ?>" target="_blank" class="btn btn-ghost btn-sm"><i class="bi bi-paperclip me-1"></i><?= e($m['attachment_name'] ?: 'Attachment') ?></a></div>
+            <?php endif; ?>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
     <?php if ($canPost): ?>
-    <form method="post" class="composer">
+    <form method="post" enctype="multipart/form-data" class="composer" style="flex-direction:column;gap:6px">
       <input type="hidden" name="action" value="send">
       <input type="hidden" name="channel" value="<?= e($active) ?>">
-      <input class="form-control" name="text" placeholder="Write a message…" required autocomplete="off" autofocus>
-      <button class="btn btn-primary"><i class="bi bi-send"></i></button>
+      <div class="d-flex gap-2 w-100">
+        <input class="form-control" name="text" placeholder="Write a message…" autocomplete="off" autofocus>
+        <label class="btn btn-ghost btn-sm mb-0" title="Attach file (PDF, image, doc…)" style="cursor:pointer;white-space:nowrap">
+          <i class="bi bi-paperclip" style="font-size:18px"></i>
+          <input type="file" name="attachment" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.zip,.txt" style="display:none" onchange="document.getElementById('att-name').textContent=this.files[0]?.name??''">
+        </label>
+        <button class="btn btn-primary"><i class="bi bi-send"></i></button>
+      </div>
+      <div id="att-name" class="muted" style="font-size:11px;padding-left:4px"></div>
     </form>
     <?php endif; ?>
   </div>

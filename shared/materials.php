@@ -7,8 +7,29 @@ $can_post = in_array($role,['mentor','management','super_admin'],true);
 if ($_SERVER['REQUEST_METHOD']==='POST' && $can_post) {
   $a=$_POST['action']??'';
   if ($a==='add') {
+    $url  = trim($_POST['url'] ?? '');
+    $kind = $_POST['kind'] ?: 'link';
+    // Handle direct file upload
+    if (!empty($_FILES['file']['name']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
+      $allowed = ['pdf','doc','docx','ppt','pptx','xls','xlsx','txt'];
+      $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+      if (in_array($ext, $allowed, true)) {
+        $dir = __DIR__ . '/../assets/uploads/materials/';
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        $fname = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($_FILES['file']['name']));
+        if (move_uploaded_file($_FILES['file']['tmp_name'], $dir . $fname)) {
+          $url  = base_url('assets/uploads/materials/' . $fname);
+          $kind = ($ext === 'pdf') ? 'pdf' : 'pdf';
+          $meta = round($_FILES['file']['size'] / 1024) . ' KB';
+          $_POST['meta'] = $meta;
+        }
+      } else {
+        flash('Only PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT files are allowed.'); header('Location: '.base_url('shared/materials.php')); exit;
+      }
+    }
+    if ($url === '') { flash('Provide a URL or upload a file.'); header('Location: '.base_url('shared/materials.php')); exit; }
     $pdo->prepare('INSERT INTO materials(title,kind,url,module,meta,team_id,posted_by) VALUES(?,?,?,?,?,?,?)')
-        ->execute([trim($_POST['title']),$_POST['kind']?:'link',trim($_POST['url']),trim($_POST['module']),trim($_POST['meta']),
+        ->execute([trim($_POST['title']),$kind,$url,trim($_POST['module']),trim($_POST['meta'] ?? ''),
                    ($_POST['team_id']?(int)$_POST['team_id']:null),$user['id']]);
     flash('Material added.');
   }
@@ -27,15 +48,19 @@ $items = $pdo->query('SELECT m.*, t.name AS team_name, u.name AS author FROM mat
 <?php if($can_post): ?>
 <div class="glass card-pad mb-3">
   <h5 class="serif mb-3"><i class="bi bi-plus-circle me-2"></i>Add new material</h5>
-  <form method="post" class="row g-2">
+  <form method="post" enctype="multipart/form-data" class="row g-2">
     <input type="hidden" name="action" value="add">
     <div class="col-md-4"><input class="form-control" name="title" placeholder="Title" required></div>
     <div class="col-md-2"><select class="form-select" name="kind"><option value="link">Link</option><option value="pdf">PDF</option><option value="video">Video</option></select></div>
-    <div class="col-md-3"><input class="form-control" name="url" placeholder="URL (https://…)" required></div>
-    <div class="col-md-3"><input class="form-control" name="module" placeholder="Module / topic"></div>
-    <div class="col-md-3"><input class="form-control" name="meta" placeholder="Meta (size, duration)"></div>
-    <div class="col-md-6"><select class="form-select" name="team_id"><option value="">All teams / everyone</option><?php foreach($teams as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['name']) ?></option><?php endforeach; ?></select></div>
-    <div class="col-md-3"><button class="btn btn-primary w-100"><i class="bi bi-cloud-upload me-1"></i>Publish</button></div>
+    <div class="col-md-6"><input class="form-control" name="url" placeholder="URL (https://…) — leave blank if uploading a file"></div>
+    <div class="col-12">
+      <label class="form-label mb-1"><i class="bi bi-paperclip me-1"></i>Or upload a file (PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX)</label>
+      <input type="file" class="form-control" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt">
+    </div>
+    <div class="col-md-4"><input class="form-control" name="module" placeholder="Module / topic"></div>
+    <div class="col-md-3"><input class="form-control" name="meta" placeholder="Meta (size, duration — auto-filled on upload)"></div>
+    <div class="col-md-5"><select class="form-select" name="team_id"><option value="">All teams / everyone</option><?php foreach($teams as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="col-12"><button class="btn btn-primary"><i class="bi bi-cloud-upload me-1"></i>Publish</button></div>
   </form>
 </div>
 <?php endif; ?>

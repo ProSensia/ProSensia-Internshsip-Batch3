@@ -32,6 +32,7 @@ function nav_link($href, $icon, $label) {
   <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
   <!-- Motivation & Goals for interns -->
   <?php if ($role === 'intern'): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>
+  <?php nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); ?>
 
   <div class="nav-section">Administration</div>
   <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
