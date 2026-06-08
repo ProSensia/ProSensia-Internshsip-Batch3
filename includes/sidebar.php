@@ -37,6 +37,7 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
   <?php nav_link('shared/team_board.php','bi-columns-gap','Team Board'); ?>
   <?php if ($role==='mentor' || $role==='super_admin'): nav_link('mentor/assign_task.php','bi-plus-square','Assign Task'); endif; ?>
+  <?php if (in_array($role,['mentor','super_admin','management'],true)): nav_link('mentor/daily_report.php','bi-bar-chart-line','Daily Report'); endif; ?>
   <?php if (in_array($role,['intern','super_admin','mentor'],true)): nav_link('intern/assignments.php','bi-clipboard-check','Assignments'); endif; ?>
   <?php nav_link('shared/materials.php','bi-book','Materials'); ?>
   <?php nav_link('shared/attendance.php','bi-calendar-check','Attendance'); ?>
@@ -46,6 +47,7 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); ?>
 
   <div class="nav-section">Administration</div>
+  <?php if (in_array($role,['super_admin','management','mentor'],true)): nav_link('admin/daily_drop_upload.php','bi-cloud-upload','Daily Drop Upload'); endif; ?>
   <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
   <?php if ($role==='super_admin'): nav_link('admin/import.php','bi-file-earmark-spreadsheet','Bulk Import'); endif; ?>
   <?php nav_link('shared/teams.php','bi-diagram-3','Teams'); ?>

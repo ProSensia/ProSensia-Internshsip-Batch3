@@ -8,92 +8,238 @@ $role       = $user['role'];
 $first_name = explode(' ', $user['name'])[0];
 
 // ─── Helpers (character SVG) ──────────────────────────────────────────
-function svg_buzz() { // AC unit, male, blue
-    return <<<SVG
-<svg width="110" height="95" viewBox="0 0 110 95" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="55" cy="93" rx="32" ry="5" fill="rgba(0,0,0,0.18)"/>
-  <!-- Body -->
-  <rect x="6" y="20" width="98" height="68" rx="10" fill="#112233"/>
-  <rect x="6" y="20" width="98" height="68" rx="10" fill="none" stroke="#29b6f6" stroke-width="2"/>
-  <!-- Top panel -->
-  <rect x="6" y="20" width="98" height="22" rx="10" fill="#0b1a28"/>
-  <rect x="6" y="32" width="98" height="10" fill="#0b1a28"/>
-  <!-- LED strip -->
-  <circle cx="20" cy="30" r="4.5" fill="#29b6f6" class="char-led"/>
-  <circle cx="33" cy="30" r="3" fill="#1a7f95" class="char-led" style="animation-delay:.6s"/>
-  <!-- Snowflake -->
-  <text x="82" y="35" font-size="14" fill="#29b6f6" text-anchor="middle">❄</text>
-  <!-- Left eye socket -->
-  <circle cx="38" cy="57" r="13" fill="#040d17"/>
+function svg_buzz() { // AC unit — male — electric blue — 160×155
+    return <<<'SVG'
+<svg width="160" height="155" viewBox="0 0 160 155" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bz-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#071524"/>
+    </linearGradient>
+    <linearGradient id="bz-panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0c2340"/>
+      <stop offset="100%" stop-color="#071524"/>
+    </linearGradient>
+    <radialGradient id="bz-eye-l" cx="40%" cy="35%">
+      <stop offset="0%"   stop-color="#81d4fa"/>
+      <stop offset="60%"  stop-color="#0288d1"/>
+      <stop offset="100%" stop-color="#01579b"/>
+    </radialGradient>
+    <radialGradient id="bz-eye-r" cx="40%" cy="35%">
+      <stop offset="0%"   stop-color="#81d4fa"/>
+      <stop offset="60%"  stop-color="#0288d1"/>
+      <stop offset="100%" stop-color="#01579b"/>
+    </radialGradient>
+    <filter id="bz-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bz-soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+
+  <!-- Ambient glow behind body -->
+  <ellipse cx="80" cy="95" rx="72" ry="60" fill="#29b6f6" opacity="0.06"/>
+
+  <!-- Shadow -->
+  <ellipse cx="80" cy="152" rx="52" ry="7" fill="rgba(0,0,0,0.35)"/>
+
+  <!-- Arms -->
+  <rect x="3"   y="65" width="18" height="50" rx="9" fill="url(#bz-body)" stroke="#29b6f6" stroke-width="1.5"/>
+  <rect x="139" y="65" width="18" height="50" rx="9" fill="url(#bz-body)" stroke="#29b6f6" stroke-width="1.5"/>
+  <!-- Hand circles -->
+  <circle cx="12"  cy="118" r="9" fill="#0d2a44" stroke="#29b6f6" stroke-width="1.5"/>
+  <circle cx="148" cy="118" r="9" fill="#0d2a44" stroke="#29b6f6" stroke-width="1.5"/>
+
+  <!-- Main body -->
+  <rect x="18" y="30" width="124" height="120" rx="18" fill="url(#bz-body)" stroke="#29b6f6" stroke-width="2"/>
+
+  <!-- Inner body highlight -->
+  <rect x="22" y="34" width="116" height="6" rx="6" fill="#29b6f6" opacity="0.12"/>
+
+  <!-- Control panel top -->
+  <rect x="18" y="30" width="124" height="38" rx="18" fill="url(#bz-panel)"/>
+  <rect x="18" y="57" width="124" height="11" fill="url(#bz-panel)"/>
+
+  <!-- LED status lights -->
+  <circle cx="38" cy="48" r="8" fill="#00bcd4" class="char-led" filter="url(#bz-soft)"/>
+  <circle cx="38" cy="48" r="5" fill="#e0f7fa" class="char-led"/>
+  <circle cx="60" cy="48" r="5" fill="#1976d2" class="char-led" style="animation-delay:.5s"/>
+  <circle cx="78" cy="48" r="5" fill="#0d47a1" class="char-led" style="animation-delay:1s"/>
+
+  <!-- Snowflake brand -->
+  <text x="118" y="56" font-size="22" fill="#29b6f6" text-anchor="middle" opacity="0.95" filter="url(#bz-soft)">❄</text>
+  <text x="118" y="56" font-size="22" fill="#81d4fa" text-anchor="middle">❄</text>
+
+  <!-- Face area -->
+  <rect x="26" y="74" width="108" height="65" rx="12" fill="rgba(0,0,0,0.28)"/>
+
+  <!-- LEFT EYE -->
+  <circle cx="57" cy="101" r="22" fill="#030e1a"/>
+  <circle cx="57" cy="101" r="18" fill="url(#bz-eye-l)"/>
+  <ellipse cx="57" cy="101" rx="14" ry="15" fill="#29b6f6" opacity="0.25"/>
   <g class="char-eye-group">
-    <circle cx="38" cy="57" r="10" fill="#29b6f6"/>
-    <circle cx="41" cy="54" r="4.5" fill="white"/>
-    <circle cx="42" cy="54" r="2.5" fill="#040d17"/>
+    <circle cx="64" cy="94" r="8" fill="white"/>
+    <circle cx="67" cy="94" r="5" fill="#01579b"/>
+    <circle cx="69" cy="92" r="2" fill="white"/>
   </g>
-  <!-- Right eye socket -->
-  <circle cx="72" cy="57" r="13" fill="#040d17"/>
+
+  <!-- RIGHT EYE -->
+  <circle cx="103" cy="101" r="22" fill="#030e1a"/>
+  <circle cx="103" cy="101" r="18" fill="url(#bz-eye-r)"/>
+  <ellipse cx="103" cy="101" rx="14" ry="15" fill="#29b6f6" opacity="0.25"/>
   <g class="char-eye-group r">
-    <circle cx="72" cy="57" r="10" fill="#29b6f6"/>
-    <circle cx="75" cy="54" r="4.5" fill="white"/>
-    <circle cx="76" cy="54" r="2.5" fill="#040d17"/>
+    <circle cx="110" cy="94" r="8" fill="white"/>
+    <circle cx="113" cy="94" r="5" fill="#01579b"/>
+    <circle cx="115" cy="92" r="2" fill="white"/>
   </g>
-  <!-- Smile -->
-  <path d="M 41 70 Q 55 80 69 70" fill="none" stroke="#29b6f6" stroke-width="2.8" stroke-linecap="round"/>
+
+  <!-- Eyebrows (cool slanted) -->
+  <path d="M 38 82 Q 56 74 70 80" fill="none" stroke="#4fc3f7" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 90 80 Q 104 74 122 82" fill="none" stroke="#4fc3f7" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Smile with teeth -->
+  <path d="M 57 122 Q 80 138 103 122" fill="none" stroke="#29b6f6" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 62 122 Q 80 134 98 122 L 98 128 Q 80 140 62 128 Z" fill="white" opacity="0.88"/>
+
+  <!-- Cheek blush -->
+  <ellipse cx="32" cy="107" rx="11" ry="8" fill="#29b6f6" opacity="0.14"/>
+  <ellipse cx="128" cy="107" rx="11" ry="8" fill="#29b6f6" opacity="0.14"/>
+
   <!-- Vent lines -->
-  <line x1="14" y1="76" x2="96" y2="76" stroke="#29b6f6" stroke-width="1.2" class="char-vent"/>
-  <line x1="14" y1="82" x2="96" y2="82" stroke="#29b6f6" stroke-width="1.2" class="char-vent"/>
+  <line x1="26" y1="143" x2="134" y2="143" stroke="#29b6f6" stroke-width="2.2" stroke-linecap="round" class="char-vent" opacity="0.65"/>
+  <line x1="26" y1="149" x2="134" y2="149" stroke="#29b6f6" stroke-width="2.2" stroke-linecap="round" class="char-vent" style="animation-delay:.3s" opacity="0.4"/>
 </svg>
 SVG;
 }
 
-function svg_gigi() { // Geyser / water-heater, female, orange
-    return <<<SVG
-<svg width="85" height="125" viewBox="0 0 85 125" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="42" cy="122" rx="25" ry="5" fill="rgba(0,0,0,0.18)"/>
-  <!-- Steam wisps -->
-  <path d="M 26 20 Q 20 11 27 6 Q 21 1 28 4" fill="none" stroke="#ffb74d" stroke-width="2.5" stroke-linecap="round" class="char-steam-a"/>
-  <path d="M 42 16 Q 38 7 44 3 Q 38 -2 45 1" fill="none" stroke="#ffb74d" stroke-width="2" stroke-linecap="round" class="char-steam-b"/>
-  <path d="M 58 20 Q 64 11 57 6 Q 63 1 56 4" fill="none" stroke="#ffb74d" stroke-width="2.5" stroke-linecap="round" class="char-steam-c"/>
-  <!-- Top cap -->
-  <ellipse cx="42" cy="27" rx="30" ry="9" fill="#bf360c"/>
-  <!-- Main body -->
-  <rect x="12" y="26" width="61" height="78" fill="#d84315"/>
-  <rect x="12" y="26" width="61" height="78" fill="none" stroke="#ff7043" stroke-width="1.5"/>
-  <!-- Bottom cap -->
-  <ellipse cx="42" cy="104" rx="30" ry="9" fill="#bf360c"/>
-  <!-- Face glow -->
-  <ellipse cx="42" cy="65" rx="24" ry="26" fill="rgba(255,120,70,0.18)"/>
-  <!-- Left eye -->
-  <ellipse cx="31" cy="59" rx="9" ry="10" fill="#2d0a00"/>
-  <g class="char-eye-group">
-    <ellipse cx="31" cy="59" rx="7" ry="8" fill="#ff7043"/>
-    <circle cx="33" cy="56" r="3" fill="white"/>
-    <circle cx="34" cy="56" r="1.8" fill="#2d0a00"/>
+function svg_gigi() { // Geyser — female — warm orange — 130×195
+    return <<<'SVG'
+<svg width="130" height="195" viewBox="0 0 130 195" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gi-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#e64a19"/>
+      <stop offset="55%"  stop-color="#bf360c"/>
+      <stop offset="100%" stop-color="#7f1900"/>
+    </linearGradient>
+    <linearGradient id="gi-cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ff7043"/>
+      <stop offset="100%" stop-color="#bf360c"/>
+    </linearGradient>
+    <radialGradient id="gi-eye-l" cx="38%" cy="35%">
+      <stop offset="0%"   stop-color="#ff8a65"/>
+      <stop offset="55%"  stop-color="#e64a19"/>
+      <stop offset="100%" stop-color="#7f1900"/>
+    </radialGradient>
+    <radialGradient id="gi-eye-r" cx="38%" cy="35%">
+      <stop offset="0%"   stop-color="#ff8a65"/>
+      <stop offset="55%"  stop-color="#e64a19"/>
+      <stop offset="100%" stop-color="#7f1900"/>
+    </radialGradient>
+    <filter id="gi-steam" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+    <filter id="gi-soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+
+  <!-- Ambient warm glow -->
+  <ellipse cx="65" cy="120" rx="60" ry="70" fill="#ff7043" opacity="0.06"/>
+
+  <!-- Shadow -->
+  <ellipse cx="65" cy="192" rx="40" ry="6" fill="rgba(0,0,0,0.32)"/>
+
+  <!-- Steam wisps (animated via CSS) -->
+  <g class="char-steam-a" opacity="0.75">
+    <path d="M 35 32 C 28 22 38 14 30 6" fill="none" stroke="#ffb74d" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M 30 6 C 24 0 32 -5 26 -11" fill="none" stroke="#ffb74d" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
   </g>
-  <!-- Left eyelashes -->
-  <line x1="22" y1="51" x2="25" y2="55" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <line x1="26" y1="49" x2="28" y2="54" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <line x1="31" y1="48" x2="31" y2="52" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <!-- Right eye -->
-  <ellipse cx="53" cy="59" rx="9" ry="10" fill="#2d0a00"/>
+  <g class="char-steam-b" opacity="0.65">
+    <path d="M 65 26 C 59 16 68 9 62 2" fill="none" stroke="#ff8a65" stroke-width="3" stroke-linecap="round"/>
+    <path d="M 62 2 C 56 -4 64 -9 58 -14" fill="none" stroke="#ff8a65" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  <g class="char-steam-c" opacity="0.75">
+    <path d="M 95 32 C 102 22 92 14 100 6" fill="none" stroke="#ffb74d" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M 100 6 C 106 0 98 -5 104 -11" fill="none" stroke="#ffb74d" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Pipe arms -->
+  <rect x="4"   y="88" width="16" height="46" rx="8" fill="url(#gi-body)" stroke="#ff7043" stroke-width="1.5"/>
+  <rect x="110" y="88" width="16" height="46" rx="8" fill="url(#gi-body)" stroke="#ff7043" stroke-width="1.5"/>
+  <circle cx="12"  cy="136" r="8" fill="#5d1300" stroke="#ff7043" stroke-width="1.5"/>
+  <circle cx="118" cy="136" r="8" fill="#5d1300" stroke="#ff7043" stroke-width="1.5"/>
+
+  <!-- Top dome cap -->
+  <ellipse cx="65" cy="42" rx="46" ry="14" fill="url(#gi-cap)"/>
+  <ellipse cx="65" cy="38" rx="42" ry="10" fill="#ff7043" opacity="0.6"/>
+
+  <!-- Main cylindrical body -->
+  <rect x="19" y="38" width="92" height="135" rx="6" fill="url(#gi-body)"/>
+  <rect x="19" y="38" width="92" height="135" rx="6" fill="none" stroke="#ff7043" stroke-width="1.8"/>
+
+  <!-- Bottom dome -->
+  <ellipse cx="65" cy="173" rx="46" ry="14" fill="url(#gi-cap)"/>
+
+  <!-- Face zone glow -->
+  <ellipse cx="65" cy="105" rx="36" ry="38" fill="#ff7043" opacity="0.1" filter="url(#gi-soft)"/>
+
+  <!-- LEFT EYE -->
+  <ellipse cx="46" cy="100" rx="16" ry="18" fill="#2d0900"/>
+  <ellipse cx="46" cy="100" rx="13" ry="15" fill="url(#gi-eye-l)"/>
+  <ellipse cx="46" cy="100" rx="9" ry="11" fill="#ff7043" opacity="0.3"/>
+  <g class="char-eye-group">
+    <circle cx="52" cy="93" r="7" fill="white"/>
+    <circle cx="55" cy="93" r="4.5" fill="#6d1900"/>
+    <circle cx="57" cy="91" r="1.8" fill="white"/>
+  </g>
+  <!-- Left eyelashes (long, feminine) -->
+  <line x1="30" y1="88" x2="35" y2="93" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="35" y1="84" x2="39" y2="90" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="42" y1="82" x2="44" y2="88" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="50" y1="82" x2="50" y2="88" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- RIGHT EYE -->
+  <ellipse cx="84" cy="100" rx="16" ry="18" fill="#2d0900"/>
+  <ellipse cx="84" cy="100" rx="13" ry="15" fill="url(#gi-eye-r)"/>
+  <ellipse cx="84" cy="100" rx="9" ry="11" fill="#ff7043" opacity="0.3"/>
   <g class="char-eye-group r">
-    <ellipse cx="53" cy="59" rx="7" ry="8" fill="#ff7043"/>
-    <circle cx="55" cy="56" r="3" fill="white"/>
-    <circle cx="56" cy="56" r="1.8" fill="#2d0a00"/>
+    <circle cx="90" cy="93" r="7" fill="white"/>
+    <circle cx="93" cy="93" r="4.5" fill="#6d1900"/>
+    <circle cx="95" cy="91" r="1.8" fill="white"/>
   </g>
   <!-- Right eyelashes -->
-  <line x1="62" y1="51" x2="59" y2="55" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <line x1="58" y1="49" x2="56" y2="54" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <line x1="53" y1="48" x2="53" y2="52" stroke="#2d0a00" stroke-width="2" stroke-linecap="round"/>
-  <!-- Nose dot -->
-  <circle cx="42" cy="69" r="3" fill="#bf360c"/>
-  <!-- Mouth -->
-  <path d="M 35 76 Q 42 84 49 76" fill="none" stroke="#bf360c" stroke-width="2.8" stroke-linecap="round"/>
-  <!-- Blush -->
-  <ellipse cx="22" cy="70" rx="7" ry="5" fill="#ff7043" opacity="0.32"/>
-  <ellipse cx="62" cy="70" rx="7" ry="5" fill="#ff7043" opacity="0.32"/>
-  <!-- Pipe bottom -->
-  <rect x="36" y="112" width="12" height="12" rx="3" fill="#8d2e0e"/>
+  <line x1="100" y1="88" x2="95" y2="93" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="95" y1="84" x2="91" y2="90" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="88" y1="82" x2="86" y2="88" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="80" y1="82" x2="80" y2="88" stroke="#1a0500" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- Eyebrows (curved, cute) -->
+  <path d="M 29 85 Q 46 78 60 84" fill="none" stroke="#ff8a65" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 70 84 Q 84 78 101 85" fill="none" stroke="#ff8a65" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Nose -->
+  <circle cx="65" cy="112" r="4" fill="#bf360c" opacity="0.8"/>
+
+  <!-- Smile / mouth -->
+  <path d="M 50 124 Q 65 140 80 124" fill="#7f1900" stroke="#ff7043" stroke-width="0"/>
+  <path d="M 50 124 Q 65 138 80 124" fill="none" stroke="#ff8a65" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Teeth -->
+  <path d="M 55 124 Q 65 134 75 124 L 75 129 Q 65 138 55 129 Z" fill="white" opacity="0.85"/>
+
+  <!-- Cheek blush (rosy) -->
+  <ellipse cx="27" cy="108" rx="12" ry="9" fill="#ff5722" opacity="0.22"/>
+  <ellipse cx="103" cy="108" rx="12" ry="9" fill="#ff5722" opacity="0.22"/>
+
+  <!-- Temperature dial / gauge -->
+  <circle cx="65" cy="152" r="14" fill="#5d1300" stroke="#ff7043" stroke-width="2"/>
+  <circle cx="65" cy="152" r="10" fill="#7f1900"/>
+  <line x1="65" y1="152" x2="65" y2="144" stroke="#ff7043" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="65" y1="152" x2="72" y2="156" stroke="#ff8a65" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Bottom pipe -->
+  <rect x="55" y="182" width="20" height="12" rx="5" fill="#5d1300" stroke="#ff7043" stroke-width="1.5"/>
 </svg>
 SVG;
 }
@@ -251,110 +397,125 @@ if ($role === 'intern') {
 
 <link rel="stylesheet" href="<?= base_url('assets/css/characters.css') ?>">
 
-<!-- ── Check-in overlay (shown if no attendance today) ───────────── -->
+<?php
+$char_cls = $char_key === 'ac' ? 'char-buzz-wrap' : 'char-gigi-wrap';
+$char_accent = $char_key === 'ac' ? '#29b6f6' : '#ff7043';
+$unlock_display = sprintf('%02d:%02d', (int)setting('daily_unlock_hour',9), (int)setting('daily_unlock_min',0));
+?>
+
+<!-- ── Check-in overlay ───────────── -->
 <?php if (!$checked_in): ?>
 <div class="checkin-overlay" id="checkin-overlay">
   <div class="checkin-card">
-    <div class="char-scene" style="margin-bottom:20px">
-      <div class="char-avatar-wrap" id="co-char"><?= $char_svg ?></div>
-      <div class="speech-bubble">
-        <div class="bubble-char-name" id="co-char-name"><?= e($char_name) ?></div>
-        <div class="bubble-text" id="co-bubble-text">Good morning <?= e($first_name) ?>! Please mark your attendance before we start today's tasks.</div>
+    <div style="display:flex;align-items:center;gap:22px;margin-bottom:24px;flex-wrap:wrap">
+      <div class="char-avatar-wrap <?= $char_cls ?>" id="co-char" style="flex-shrink:0"><?= $char_svg ?></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);margin-bottom:6px" id="co-char-name"><?= e($char_name) ?></div>
+        <div class="speech-bubble" style="border-radius:0 16px 16px 16px">
+          <div class="bubble-text" id="co-bubble-text">Good morning <?= e($first_name) ?>! Please mark your attendance before we start today's tasks.</div>
+        </div>
       </div>
     </div>
     <form id="checkin-form">
       <input type="hidden" name="action" value="check_in_inline">
       <div class="mb-3">
-        <label class="form-label">Optional note <span class="muted">(e.g. WFH, on-site)</span></label>
+        <label class="form-label">Optional note <span class="muted">(WFH, on-site, etc.)</span></label>
         <input class="form-control" name="note" placeholder="Any note for today…" id="ci-note">
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <button type="submit" class="btn btn-primary flex-grow-1" id="ci-btn">
+        <button type="submit" class="btn btn-primary flex-grow-1" id="ci-btn" style="font-size:15px;font-weight:700;padding:12px">
           <i class="bi bi-box-arrow-in-right me-2"></i>Check In &amp; Start Tasks
         </button>
-        <a href="<?= base_url('shared/attendance.php') ?>" class="btn btn-ghost">Full attendance page</a>
+        <a href="<?= base_url('shared/attendance.php') ?>" class="btn btn-ghost">Full page</a>
       </div>
     </form>
   </div>
 </div>
 <?php endif; ?>
 
-<!-- ── Lock screen (shown via JS before 9 AM) ──────────────────────── -->
+<!-- ── Lock screen ──────────────────────── -->
 <div id="lock-screen" style="display:none">
   <div class="glass card-pad lock-screen-wrap">
-    <div class="char-scene" style="justify-content:center;flex-direction:column;align-items:center;gap:14px">
-      <div class="char-avatar-wrap" id="lock-char"><?= $char_svg ?></div>
-      <div class="speech-bubble" style="max-width:420px;border-radius:16px">
-        <div class="bubble-char-name"><?= e($char_name) ?></div>
-        <div class="bubble-text" id="lock-bubble">Tasks unlock at 9:00 AM sharp. Getting everything ready for you!</div>
-      </div>
+    <div class="char-avatar-wrap <?= $char_cls ?>" id="lock-char" style="margin-bottom:8px"><?= $char_svg ?></div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)"><?= e($char_name) ?></div>
+    <div class="speech-bubble" style="max-width:440px;border-radius:16px;text-align:left">
+      <div class="bubble-text" id="lock-bubble">Tasks unlock at <?= $unlock_display ?> sharp. Getting everything ready for you!</div>
     </div>
     <div class="lock-label">New tasks available in</div>
     <div class="countdown-clock" id="countdown-clock">00:00:00</div>
-    <div class="lock-info-badge"><i class="bi bi-calendar3 me-2"></i>Today: <?= e(date('l, F j')) ?></div>
+    <div class="lock-info-badge"><i class="bi bi-calendar3 me-2"></i><?= e(date('l, F j, Y')) ?></div>
     <?php if (!$checked_in): ?>
-    <div class="mt-2">
-      <a href="<?= base_url('shared/attendance.php') ?>" class="btn btn-outline-light btn-sm">
-        <i class="bi bi-box-arrow-in-right me-2"></i>Mark attendance while you wait
-      </a>
-    </div>
+    <a href="<?= base_url('shared/attendance.php') ?>" class="btn btn-outline-light btn-sm">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Mark attendance while you wait
+    </a>
     <?php endif; ?>
     <?php if ($tomorrow_count > 0): ?>
-    <div class="muted" style="font-size:12px"><i class="bi bi-info-circle me-1"></i><?= $tomorrow_count ?> task(s) already queued for tomorrow</div>
+    <div class="muted" style="font-size:12px"><i class="bi bi-info-circle me-1"></i><?= $tomorrow_count ?> task(s) queued for tomorrow</div>
     <?php endif; ?>
   </div>
 </div>
 
 <!-- ── Main wizard container ────────────────────────────────────────── -->
 <div id="wizard-wrap" style="display:none">
+
+  <!-- Header bar -->
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-      <h1 class="serif mb-0" style="font-size:34px">Daily Tasks</h1>
-      <p class="muted mb-0"><?= e(date('l, F j, Y')) ?> · <?= count($tasks) ?> task<?= count($tasks)!==1?'s':'' ?> today<?= $intern_field ? ' · '.e($intern_field) : '' ?></p>
+      <h1 class="serif mb-0" style="font-size:32px">Daily Tasks</h1>
+      <p class="muted mb-0" style="font-size:13px">
+        <?= e(date('l, F j, Y')) ?>
+        <?= $intern_field ? ' &middot; <span style="color:'.e($char_accent).'">'.e($intern_field).'</span>' : '' ?>
+        &middot; <?= count($tasks) ?> task<?= count($tasks)!==1?'s':'' ?>
+      </p>
     </div>
     <div class="d-flex gap-2 align-items-center">
-      <label class="voice-toggle-row mb-0">
+      <label class="voice-toggle-row mb-0" style="font-size:13px">
         <input type="checkbox" id="voice-toggle" checked>
-        <i class="bi bi-volume-up"></i> Voice
+        <i class="bi bi-volume-up-fill"></i> Voice
       </label>
       <?php if ($checked_in): ?>
-      <span class="badge b-success"><i class="bi bi-check-circle me-1"></i>Checked in <?= e(substr($today_att['check_in'],0,5)) ?></span>
+      <span class="badge b-success" style="font-size:12px"><i class="bi bi-check-circle me-1"></i>Checked in <?= e(substr($today_att['check_in'],0,5)) ?></span>
       <?php endif; ?>
     </div>
   </div>
 
-  <!-- Wizard progress dots -->
+  <!-- Progress bar -->
   <div class="wiz-progress-bar" id="wiz-progress"></div>
 
-  <!-- Character + speech bubble -->
-  <div class="glass card-pad mb-3">
-    <div class="char-scene" id="char-scene">
-      <div class="char-avatar-wrap" id="char-avatar-wrap"><?= $char_svg ?></div>
-      <div class="speech-bubble">
-        <div class="voice-toggle-row" style="font-size:11px">
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:var(--muted)">
-            <input type="checkbox" id="voice-toggle2" checked> <i class="bi bi-volume-up"></i>
-          </label>
-        </div>
-        <div class="bubble-char-name" id="char-name"><?= e($char_name) ?></div>
-        <div class="bubble-text" id="bubble-text"></div>
+  <!-- ── Hero: character left, bubble right ── -->
+  <div class="wiz-hero" id="wiz-hero">
+    <div class="wiz-char-pane">
+      <div class="char-avatar-wrap <?= $char_cls ?>" id="char-avatar-wrap"><?= $char_svg ?></div>
+      <div class="wiz-char-label">
+        <div class="char-name" id="char-name"><?= e($char_name) ?></div>
+        <div class="char-title"><?= $char_key === 'ac' ? 'AI &amp; IoT Guide' : 'Learning Guide' ?></div>
       </div>
+      <label class="voice-toggle-row mt-1" style="font-size:11px">
+        <input type="checkbox" id="voice-toggle2" checked> <i class="bi bi-volume-up"></i>
+      </label>
     </div>
-
-    <!-- Task detail injected by JS -->
-    <div id="task-content"></div>
-    <!-- Q&A section injected by JS -->
-    <div id="qa-section" style="display:none"></div>
-    <!-- Action buttons injected by JS -->
-    <div id="task-actions"></div>
+    <div class="wiz-bubble-pane">
+      <div class="wiz-bubble-area">
+        <div class="speech-bubble">
+          <div class="bubble-char-name" id="bubble-char-label"><?= e($char_name) ?></div>
+          <div class="bubble-text" id="bubble-text"></div>
+        </div>
+      </div>
+      <!-- Task detail injected by JS -->
+      <div id="task-content"></div>
+      <!-- Q&A + debate injected by JS -->
+      <div id="qa-section"></div>
+      <!-- Action buttons injected by JS -->
+      <div id="task-actions"></div>
+    </div>
   </div>
 </div>
 
-<!-- ── No-tasks fallback (shown via JS if 0 tasks) ─────────────────── -->
+<!-- ── No-tasks fallback ─────────────────── -->
 <div id="no-tasks-wrap" style="display:none" class="glass card-pad text-center py-5">
-  <div class="char-avatar-wrap" style="display:inline-block;margin-bottom:16px"><?= $char_svg ?></div>
-  <h4 class="serif">No tasks scheduled for today</h4>
-  <p class="muted">Your mentor will assign tasks that appear here at 9 AM.</p>
+  <div class="char-avatar-wrap <?= $char_cls ?>" style="display:inline-block;margin-bottom:20px"><?= $char_svg ?></div>
+  <h4 class="serif" style="font-size:24px">No tasks scheduled for today</h4>
+  <p class="muted">Your mentor will assign tasks that appear here at <?= $unlock_display ?>.</p>
   <div class="d-flex gap-2 justify-content-center mt-3">
     <a href="<?= base_url('intern/board.php') ?>" class="btn btn-ghost"><i class="bi bi-kanban me-1"></i>My Board</a>
     <a href="<?= base_url('shared/materials.php') ?>" class="btn btn-ghost"><i class="bi bi-book me-1"></i>Materials</a>

@@ -365,30 +365,73 @@ class WizardController {
   _renderDetail(t) {
     const sb = { pending:'b-muted', in_progress:'b-warning', done:'b-success' };
     const sl = { pending:'Pending', in_progress:'In Progress', done:'Done' };
+
+    // ── Header ──
     let h = '<div class="task-detail-card">';
-    if (t.field || t.target_field) {
-      h += `<div class="task-field-badge"><i class="bi bi-diagram-3 me-1"></i>${esc(t.field||t.target_field)}</div>`;
+    h += '<div class="task-card-header">';
+    if (t.target_field) {
+      h += `<div class="task-field-badge"><i class="bi bi-diagram-3"></i>${esc(t.target_field)}</div>`;
     }
-    h += `<div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
-            <h4 class="serif mb-0">${esc(t.title)}</h4>
+    h += `<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <h4 class="serif mb-0" style="font-size:21px">${esc(t.title)}</h4>
             <span class="badge ${sb[t._localStatus]||'b-muted'}">${sl[t._localStatus]||t._localStatus}</span>
           </div>`;
-    if (t.description) {
-      h += `<p class="muted mb-3" style="font-size:14px;white-space:pre-wrap">${esc(t.description)}</p>`;
-    }
-    h += `<div class="muted" style="font-size:12px"><i class="bi bi-clock me-1"></i>${esc(String(t.est_minutes))} min estimated`;
-    if (t.due_date) h += ` · <i class="bi bi-calendar3 me-1"></i>Due ${esc(t.due_date)}`;
-    if (t.assigned_by_name) h += ` · <i class="bi bi-person me-1"></i>Assigned by ${esc(t.assigned_by_name)}`;
+    h += '<div class="task-meta-row mt-2">';
+    h += `<span><i class="bi bi-clock"></i>${esc(String(t.est_minutes))} min</span>`;
+    if (t.task_date) h += `<span><i class="bi bi-calendar3"></i>${esc(t.task_date)}</span>`;
+    if (t.due_date && t.due_date !== t.task_date) h += `<span><i class="bi bi-flag"></i>Due ${esc(t.due_date)}</span>`;
+    if (t.assigned_by_name) h += `<span><i class="bi bi-person"></i>${esc(t.assigned_by_name)}</span>`;
     h += '</div>';
-    if (t.video_url) {
-      h += `<a href="${esc(t.video_url)}" target="_blank" class="task-video-link">
-              <i class="bi bi-play-circle-fill vi"></i>
-              <div><div style="font-weight:600">Watch Resource</div>
-              <div class="muted" style="font-size:12px">Opens in new tab — come back when done</div></div>
-              <i class="bi bi-box-arrow-up-right ms-auto" style="font-size:14px;opacity:.45"></i>
+    h += '</div>'; // /task-card-header
+
+    // ── Body ──
+    h += '<div class="task-card-body">';
+
+    if (t.description && t.description.trim()) {
+      h += '<div class="task-section-label"><i class="bi bi-file-text me-1"></i>Mission Brief</div>';
+      h += `<div class="task-description">${esc(t.description)}</div>`;
+    }
+
+    // Resources section
+    const hasVideo = t.video_url && t.video_url.trim();
+    if (hasVideo) {
+      h += '<div class="task-section-label"><i class="bi bi-collection-play me-1"></i>Resources</div>';
+      h += '<div class="task-resources">';
+
+      // Primary video
+      const vUrl = t.video_url.trim();
+      const isYT  = /youtu\.?be/.test(vUrl);
+      const isSc  = /scrimba/.test(vUrl);
+      const vLabel = isYT ? 'YouTube Video' : isSc ? 'Scrimba Module' : 'Watch Resource';
+      const vSub   = isYT ? 'Click to open on YouTube' : isSc ? 'Open in Scrimba' : 'Opens in new tab';
+      h += `<a href="${esc(vUrl)}" target="_blank" rel="noopener" class="task-resource-card rc-video">
+              <div class="rc-icon"><i class="bi bi-play-circle-fill"></i></div>
+              <div class="rc-text">
+                <div class="rc-title">${vLabel}</div>
+                <div class="rc-sub">${vSub} · Watch first before building</div>
+              </div>
+              <i class="bi bi-box-arrow-up-right" style="font-size:13px;opacity:.4;margin-left:auto"></i>
             </a>`;
+
+      h += '</div>'; // /task-resources
     }
-    h += '</div>';
+
+    // Submission links hint
+    h += `<div class="task-section-label" style="margin-top:20px"><i class="bi bi-send me-1"></i>Submission Checklist</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:8px 14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--border)">
+              <i class="bi bi-kanban" style="color:#60a5fa"></i> Move Kanban card → <strong style="color:var(--text)">Under Review</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:8px 14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--border)">
+              <i class="bi bi-github" style="color:#a78bfa"></i> Push to <strong style="color:var(--text)">GitHub</strong>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:8px 14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--border)">
+              <i class="bi bi-linkedin" style="color:#29b6f6"></i> Post on <strong style="color:var(--text)">LinkedIn</strong>
+            </div>
+          </div>`;
+
+    h += '</div>'; // /task-card-body
+    h += '</div>'; // /task-detail-card
     return h;
   }
 
