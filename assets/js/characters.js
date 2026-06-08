@@ -184,13 +184,15 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 function pad2(n)   { return String(n).padStart(2,'0'); }
 function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function _unlockHour() { return (typeof PS_UNLOCK_HOUR !== 'undefined') ? PS_UNLOCK_HOUR : 9; }
+function _unlockMin()  { return (typeof PS_UNLOCK_MIN  !== 'undefined') ? PS_UNLOCK_MIN  : 0; }
 function isUnlocked() {
-  const now = new Date();
-  return now.getHours() >= 9;
+  const now = new Date(), h = _unlockHour(), m = _unlockMin();
+  return now.getHours() > h || (now.getHours() === h && now.getMinutes() >= m);
 }
 function getCountdown() {
   const now = new Date(), tgt = new Date(now);
-  tgt.setHours(9,0,0,0);
+  tgt.setHours(_unlockHour(), _unlockMin(), 0, 0);
   if (now >= tgt) return null;
   const d = tgt - now;
   return { h:Math.floor(d/3600000), m:Math.floor((d%3600000)/60000), s:Math.floor((d%60000)/1000),

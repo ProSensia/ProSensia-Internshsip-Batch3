@@ -366,10 +366,12 @@ if ($role === 'intern') {
 const PS_TASKS = <?= json_encode(array_values($tasks), JSON_UNESCAPED_UNICODE) ?>;
 PS_TASKS.forEach(function(t){ t._localStatus = t.status; });
 
-const PS_NAME    = <?= json_encode($first_name) ?>;
-const PS_CHAR    = <?= json_encode($char_key) ?>;
-const PS_ATT_OK  = <?= $checked_in ? 'true' : 'false' ?>;
-const PS_URLS    = {
+const PS_NAME        = <?= json_encode($first_name) ?>;
+const PS_CHAR        = <?= json_encode($char_key) ?>;
+const PS_ATT_OK      = <?= $checked_in ? 'true' : 'false' ?>;
+const PS_UNLOCK_HOUR = <?= (int)setting('daily_unlock_hour', 9) ?>;
+const PS_UNLOCK_MIN  = <?= (int)setting('daily_unlock_min',  0) ?>;
+const PS_URLS        = {
   tasks:      <?= json_encode(base_url('intern/tasks.php')) ?>,
   attendance: <?= json_encode(base_url('shared/attendance.php')) ?>,
   socialPost: <?= json_encode(base_url('intern/social_post.php')) ?>,

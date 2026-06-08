@@ -12,6 +12,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     }
     flash('Settings saved.');
   }
+  if ($a==='save_schedule') {
+    $unlock_hour = max(0, min(23, (int)($_POST['daily_unlock_hour'] ?? 9)));
+    $unlock_min  = max(0, min(59, (int)($_POST['daily_unlock_min']  ?? 0)));
+    $pdo->prepare('INSERT INTO settings(k,v) VALUES(?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)')->execute(['daily_unlock_hour', $unlock_hour]);
+    $pdo->prepare('INSERT INTO settings(k,v) VALUES(?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)')->execute(['daily_unlock_min',  $unlock_min]);
+    flash('Task unlock time updated to '.sprintf('%02d:%02d', $unlock_hour, $unlock_min).'.', 'success');
+  }
   if ($a==='upload_logo' || $a==='upload_partner') {
     $field = $a==='upload_logo' ? 'logo' : 'partner';
     $key   = $a==='upload_logo' ? 'logo_path' : 'partner_logo_path';
@@ -34,9 +41,40 @@ $logo = setting('logo_path','assets/img/prosensia-logo.png');
 $partner = setting('partner_logo_path','');
 $batch = setting('cert_batch','Batch 3 — Summer 2026');
 $sig = setting('cert_signatory','Aisha Khan, Director — ProSensia');
+$unlock_hour = (int)setting('daily_unlock_hour', 9);
+$unlock_min  = (int)setting('daily_unlock_min',  0);
 ?>
-<h1 class="serif" style="font-size:34px">Portal settings</h1>
-<p class="muted">Branding, partner logo (e.g. Pak-Austria), and certificate defaults.</p>
+<h1 class="serif" style="font-size:34px">Portal Settings</h1>
+<p class="muted">Branding, schedule controls, partner logo, and certificate defaults.</p>
+
+<!-- ── Daily Task Schedule ── -->
+<div class="glass card-pad mb-4" style="border-left:4px solid var(--primary)">
+  <h5 class="serif mb-1"><i class="bi bi-clock-fill me-2" style="color:var(--primary)"></i>Daily Task Unlock Time</h5>
+  <p class="muted mb-3" style="font-size:13px">Interns see a locked countdown screen until this time each day. The character speaks a waiting message. Set to <strong>00:00</strong> to disable the lock entirely.</p>
+  <form method="post" class="row g-3 align-items-end">
+    <input type="hidden" name="action" value="save_schedule">
+    <div class="col-auto">
+      <label class="form-label fw-semibold">Hour (0–23)</label>
+      <input type="number" class="form-control" name="daily_unlock_hour" min="0" max="23" value="<?= $unlock_hour ?>" style="width:100px">
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-semibold">Minute (0–59)</label>
+      <input type="number" class="form-control" name="daily_unlock_min" min="0" max="59" value="<?= $unlock_min ?>" style="width:100px">
+    </div>
+    <div class="col-auto">
+      <div class="form-label">&nbsp;</div>
+      <button class="btn btn-primary"><i class="bi bi-save me-1"></i>Save Unlock Time</button>
+    </div>
+    <div class="col-12">
+      <div class="alert alert-info py-2 mb-0" style="font-size:13px">
+        <i class="bi bi-info-circle me-1"></i>
+        Currently set to <strong><?= sprintf('%02d:%02d', $unlock_hour, $unlock_min) ?></strong>
+        (<?= $unlock_hour < 12 ? ($unlock_hour === 0 ? '12' : $unlock_hour).':'.sprintf('%02d',$unlock_min).' AM' : ($unlock_hour === 12 ? '12' : $unlock_hour-12).':'.sprintf('%02d',$unlock_min).' PM' ?>).
+        Interns in all fields are locked out until this time daily.
+      </div>
+    </div>
+  </form>
+</div>
 
 <div class="row g-3 mt-2">
   <div class="col-md-6">
