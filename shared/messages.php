@@ -4,21 +4,36 @@ require __DIR__ . '/../includes/header.php';
 require_login();
 $uid = $user['id']; $role = $user['role'];
 
-// Channels available to current user
+// Channels available to current user — hierarchy: announcements, CEO DM, management DMs, mentor DMs, team channels, general, intern DMs
 $channels = [];
-$channels[] = ['key'=>'channel:announcements','label'=>'#announcements','sub'=>'Read-only · Super Admin posts'];
-$channels[] = ['key'=>'channel:general','label'=>'#general','sub'=>'Everyone'];
+$channels[] = ['key'=>'channel:announcements','label'=>'📢 #announcements','sub'=>'Read-only · CEO / Super Admin','pinned'=>true];
+$channels[] = ['key'=>'channel:general','label'=>'# general','sub'=>'Everyone','pinned'=>false];
 
-$teamsQ = $pdo->prepare('SELECT t.id,t.name FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? ORDER BY t.name');
-$teamsQ->execute([$uid]);
-foreach($teamsQ->fetchAll() as $t) {
-    $channels[] = ['key'=>'team:'.$t['id'],'label'=>'# '.$t['name'],'sub'=>'Team channel'];
+// Team channels (interns only see their own teams)
+if (in_array($role,['super_admin','management','mentor'],true)) {
+    $teamsAll = $pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll();
+} else {
+    $teamsQ = $pdo->prepare('SELECT t.id,t.name FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? ORDER BY t.name');
+    $teamsQ->execute([$uid]); $teamsAll = $teamsQ->fetchAll();
 }
-// DMs
-$peers = $pdo->prepare('SELECT id,name,role FROM users WHERE id<>? ORDER BY name'); $peers->execute([$uid]);
+foreach($teamsAll as $t) {
+    $channels[] = ['key'=>'team:'.$t['id'],'label'=>'# '.$t['name'],'sub'=>'Team channel','pinned'=>false];
+}
+
+// DMs — ordered by role priority: super_admin → management → mentor → intern
+$peers = $pdo->prepare("SELECT id,name,role FROM users WHERE id<>? ORDER BY FIELD(role,'super_admin','management','mentor','intern'), name");
+$peers->execute([$uid]);
+$role_icons = ['super_admin'=>'👑 ', 'management'=>'🏢 ', 'mentor'=>'🎓 ', 'intern'=>''];
 foreach($peers->fetchAll() as $p) {
     $ids = [$uid,(int)$p['id']]; sort($ids);
-    $channels[] = ['key'=>'dm:'.$ids[0].'|'.$ids[1],'label'=>'DM · '.$p['name'],'sub'=>role_label($p['role'])];
+    $icon = $role_icons[$p['role']] ?? '';
+    $channels[] = [
+        'key'   => 'dm:'.$ids[0].'|'.$ids[1],
+        'label' => $icon.'DM · '.$p['name'],
+        'sub'   => role_label($p['role']),
+        'pinned'=> $p['role']==='super_admin',
+        'role'  => $p['role'],
+    ];
 }
 
 $active = $_GET['ch'] ?? $channels[0]['key'];
@@ -62,9 +77,37 @@ $canPost = !($active==='channel:announcements' && $role!=='super_admin');
 
 <div class="chat-shell glass">
   <div class="chat-list" style="border-right:1px solid var(--border)">
-    <?php foreach($channels as $c): ?>
+    <?php
+    // Group: pinned (CEO/admin DMs + announcements) then the rest
+    $pinned   = array_filter($channels, fn($c)=>!empty($c['pinned']));
+    $unpinned = array_filter($channels, fn($c)=>empty($c['pinned']));
+    if ($pinned): ?>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--primary);padding:10px 12px 4px;font-weight:700">Priority</div>
+    <?php foreach($pinned as $c): ?>
+      <a class="item <?= $c['key']===$active?'active':'' ?>" href="?ch=<?= urlencode($c['key']) ?>" style="border-left:2.5px solid var(--primary);background:rgba(212,168,76,.04)">
+        <div style="font-weight:600"><?= e($c['label']) ?></div>
+        <div class="sub"><?= e($c['sub']) ?></div>
+      </a>
+    <?php endforeach;
+    if ($unpinned): ?>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:10px 12px 4px;font-weight:700;margin-top:4px">Channels &amp; DMs</div>
+    <?php endif;
+    endif;
+    foreach($unpinned as $c):
+      $role_c = $c['role'] ?? '';
+      $role_dot = match($role_c) {
+          'super_admin' => 'background:#d4a84c',
+          'management'  => 'background:#60a5fa',
+          'mentor'      => 'background:#34d399',
+          default       => ''
+      };
+    ?>
       <a class="item <?= $c['key']===$active?'active':'' ?>" href="?ch=<?= urlencode($c['key']) ?>">
-        <div><?= e($c['label']) ?></div><div class="sub"><?= e($c['sub']) ?></div>
+        <div class="d-flex align-items-center gap-1">
+          <?php if($role_dot): ?><span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;<?= $role_dot ?>"></span><?php endif; ?>
+          <?= e($c['label']) ?>
+        </div>
+        <div class="sub"><?= e($c['sub']) ?></div>
       </a>
     <?php endforeach; ?>
   </div>

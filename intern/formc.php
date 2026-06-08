@@ -143,9 +143,12 @@ if ($role === 'intern') {
         <!-- Employer Section (editable, required) -->
         <h5 class="serif mb-3">To be filled by Internship Industry/Organization Representative</h5>
         <div class="row g-3">
-            <div class="col-md-6"><label class="form-label">Internship employer name <span
-                        class="text-danger">*</span></label><input class="form-control" name="employer_name"
-                    value="<?= e($f['employer_name'] ?? '') ?>" required></div>
+            <div class="col-md-6">
+              <label class="form-label">Internship employer name <span class="text-danger">*</span></label>
+              <input class="form-control" name="employer_name"
+                value="<?= e($f['employer_name'] ?? 'ProSensia') ?>" required>
+              <div class="muted" style="font-size:11px;margin-top:3px"><i class="bi bi-info-circle me-1"></i>Must be <strong>ProSensia</strong> — do not change this.</div>
+            </div>
             <div class="col-md-6"><label class="form-label">Internship department <span
                         class="text-danger">*</span></label><input class="form-control" name="employer_dept"
                     value="<?= e($f['employer_dept'] ?? '') ?>" required></div>

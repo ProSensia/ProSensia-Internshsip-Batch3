@@ -19,4 +19,26 @@ try {
     // Phase 3: message attachments
     if (!col_exists($pdo,'chat_messages','attachment_path')) run_silent($pdo,"ALTER TABLE chat_messages ADD COLUMN attachment_path VARCHAR(255) NULL");
     if (!col_exists($pdo,'chat_messages','attachment_name')) run_silent($pdo,"ALTER TABLE chat_messages ADD COLUMN attachment_name VARCHAR(255) NULL");
+    // Phase 4: interactive task wizard
+    if (!col_exists($pdo,'daily_tasks','target_field'))  run_silent($pdo,"ALTER TABLE daily_tasks ADD COLUMN target_field VARCHAR(80) NULL");
+    if (!col_exists($pdo,'daily_tasks','video_url'))     run_silent($pdo,"ALTER TABLE daily_tasks ADD COLUMN video_url VARCHAR(300) NULL");
+    // Task version control log
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS task_progress_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        task_id INT NOT NULL, user_id INT NOT NULL,
+        old_status VARCHAR(20), new_status VARCHAR(20),
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(task_id), INDEX(user_id)
+    ) ENGINE=InnoDB");
+    // Notifications
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        to_user_id INT NOT NULL, from_user_id INT,
+        type VARCHAR(40) DEFAULT 'info',
+        message TEXT NOT NULL,
+        link VARCHAR(300),
+        read_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(to_user_id), INDEX(read_at)
+    ) ENGINE=InnoDB");
 } catch (Exception $e) {}

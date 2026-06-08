@@ -1,11 +1,22 @@
 <?php
 $role = $user['role'];
 $current = $_SERVER['SCRIPT_NAME'];
-function nav_link($href, $icon, $label) {
+
+// Unread notification counts per target page
+$_notif_counts = [];
+try {
+    $nq = $pdo->prepare("SELECT link, COUNT(*) as cnt FROM notifications WHERE to_user_id=? AND read_at IS NULL GROUP BY link");
+    $nq->execute([$user['id']]);
+    foreach ($nq->fetchAll() as $nr) { $_notif_counts[$nr['link']] = (int)$nr['cnt']; }
+} catch(Exception $_ne) {}
+$_notif_total = array_sum($_notif_counts);
+
+function nav_link($href, $icon, $label, $badge = 0) {
   global $current;
   $abs = base_url($href);
   $active = basename($current) === basename($href) ? 'active' : '';
-  echo '<a class="nav-link '.$active.'" href="'.$abs.'"><i class="bi '.$icon.'"></i><span>'.$label.'</span></a>';
+  $bdg = $badge > 0 ? '<span class="notif-dot" style="background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto">'.($badge>99?'99+':$badge).'</span>' : '';
+  echo '<a class="nav-link '.$active.'" href="'.$abs.'"><i class="bi '.$icon.'"></i><span style="flex:1">'.$label.'</span>'.$bdg.'</a>';
 }
 ?>
 <aside class="sidebar">
@@ -22,7 +33,7 @@ function nav_link($href, $icon, $label) {
   <div class="nav-section">Workspace</div>
   <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/enrollment.php','bi-journal-check','Enrollment'); endif; ?>
   <?php if (in_array($role,['intern','super_admin'],true)): nav_link('intern/profile.php','bi-person-vcard','Profile'); endif; ?>
-  <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/tasks.php','bi-list-check','Daily Tasks'); endif; ?>
+  <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/tasks.php','bi-list-check','Daily Tasks', $_notif_counts['intern/tasks.php'] ?? 0); endif; ?>
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
   <?php nav_link('shared/team_board.php','bi-columns-gap','Team Board'); ?>
   <?php if ($role==='mentor' || $role==='super_admin'): nav_link('mentor/assign_task.php','bi-plus-square','Assign Task'); endif; ?>
@@ -45,4 +56,5 @@ function nav_link($href, $icon, $label) {
   <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
   <?php if ($role==='super_admin'): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
   <?php if ($role==='super_admin'): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
+  <?php if ($role==='super_admin'): nav_link('admin/task_log.php','bi-clock-history','Task Version Log', $_notif_counts['admin/task_log.php'] ?? 0); endif; ?>
 </aside>

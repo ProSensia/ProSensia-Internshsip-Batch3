@@ -68,10 +68,31 @@ CREATE TABLE daily_tasks (
   duration_days INT DEFAULT 1,
   task_date DATE NOT NULL, due_date DATE,
   assigned_by INT, assigned_to INT NULL, team_id INT NULL,
+  target_field VARCHAR(80) NULL,
+  video_url VARCHAR(300) NULL,
   status ENUM('pending','in_progress','done') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE task_progress_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  task_id INT NOT NULL, user_id INT NOT NULL,
+  old_status VARCHAR(20), new_status VARCHAR(20),
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(task_id), INDEX(user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE notifications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  to_user_id INT NOT NULL, from_user_id INT,
+  type VARCHAR(40) DEFAULT 'info',
+  message TEXT NOT NULL,
+  link VARCHAR(300),
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(to_user_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE task_checkpoints (
