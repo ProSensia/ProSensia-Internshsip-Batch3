@@ -65,29 +65,65 @@ $items = $pdo->query('SELECT m.*, t.name AS team_name, u.name AS author FROM mat
 </div>
 <?php endif; ?>
 
-<div class="bento">
+<?php
+// Group by team (or "All Teams")
+$items_all   = array_filter($items, fn($m) => !$m['team_id']);
+$items_team  = array_filter($items, fn($m) =>  $m['team_id']);
+// For interns: show only their team's materials + all-team materials
+if ($role === 'intern') {
+    $my_team = null;
+    try {
+        $tq = $pdo->prepare('SELECT t.id, t.name FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? LIMIT 1');
+        $tq->execute([$user['id']]); $my_team = $tq->fetch();
+    } catch(Exception $_te){}
+    if ($my_team) {
+        $items = array_filter($items, fn($m) => !$m['team_id'] || $m['team_id'] == $my_team['id']);
+    }
+}
+?>
+
+<?php if(empty($items)): ?>
+<div class="glass card-pad text-center py-5 mt-3">
+  <i class="bi bi-journal-x" style="font-size:48px;opacity:.35;color:var(--primary-glow)"></i>
+  <h5 class="serif mt-3">No materials yet</h5>
+  <?php if($can_post): ?>
+  <p class="muted">Use the form above to publish your first material — link, video, or PDF.</p>
+  <?php else: ?>
+  <p class="muted">Your mentors haven't published any materials yet. Check back soon!</p>
+  <?php endif; ?>
+</div>
+<?php else: ?>
+<div class="bento mt-3">
   <?php foreach($items as $m):
     $icon=['pdf'=>'bi-file-earmark-pdf','video'=>'bi-play-circle','link'=>'bi-link-45deg'][$m['kind']]??'bi-link-45deg';
+    $icon_color=['pdf'=>'#f87171','video'=>'#60a5fa','link'=>'#34d399'][$m['kind']]??'var(--primary-glow)';
   ?>
     <div class="glass card-pad span-4">
       <div class="d-flex align-items-start gap-3">
-        <i class="bi <?= $icon ?>" style="font-size:28px;color:var(--primary-glow)"></i>
-        <div class="flex-grow-1">
-          <h5 class="serif mb-1"><?= e($m['title']) ?></h5>
-          <div class="muted" style="font-size:12px"><?= e($m['module']) ?> · <?= e($m['meta']) ?></div>
-          <div class="muted" style="font-size:11px;margin-top:4px">
-            <?= $m['team_name'] ? '<span class="badge b-primary">'.e($m['team_name']).'</span>' : '<span class="badge b-muted">All teams</span>' ?>
-            <?php if($m['author']): ?> · by <?= e($m['author']) ?><?php endif; ?>
+        <i class="bi <?= $icon ?>" style="font-size:30px;color:<?= $icon_color ?>;flex-shrink:0"></i>
+        <div class="flex-grow-1 min-w-0">
+          <h5 class="serif mb-1" style="font-size:16px"><?= e($m['title']) ?></h5>
+          <?php if($m['module']): ?><div class="muted" style="font-size:12px"><?= e($m['module']) ?><?= $m['meta'] ? ' · '.e($m['meta']) : '' ?></div><?php endif; ?>
+          <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+            <?= $m['team_name'] ? '<span class="badge b-primary" style="font-size:10px">'.e($m['team_name']).'</span>' : '<span class="badge b-muted" style="font-size:10px">All teams</span>' ?>
+            <?php if($m['author']): ?><span class="muted" style="font-size:10px">by <?= e($m['author']) ?></span><?php endif; ?>
           </div>
         </div>
       </div>
       <div class="mt-3 d-flex gap-2">
-        <a href="<?= e($m['url']) ?>" target="_blank" class="btn btn-outline-light btn-sm flex-grow-1"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+        <a href="<?= e($m['url']) ?>" target="_blank" class="btn btn-outline-light btn-sm flex-grow-1">
+          <i class="bi bi-box-arrow-up-right me-1"></i><?= $m['kind']==='pdf' ? 'View PDF' : ($m['kind']==='video' ? 'Watch' : 'Open') ?>
+        </a>
         <?php if($can_post): ?>
-        <form method="post" onsubmit="return confirm('Delete?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$m['id'] ?>"><button class="btn btn-danger btn-sm"><i class="bi bi-trash"></i></button></form>
+        <form method="post" onsubmit="return confirm('Delete this material?')">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
+          <button class="btn btn-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+        </form>
         <?php endif; ?>
       </div>
     </div>
   <?php endforeach; ?>
 </div>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

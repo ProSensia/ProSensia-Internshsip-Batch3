@@ -347,24 +347,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ─── Fetch tasks ──────────────────────────────────────────────────────
 if ($role === 'intern') {
-    // LIKE match: target_field is a keyword that must appear inside intern_field
-    // e.g.  target_field="AI"  matches  intern_field="AI & ML Engineering"
-    $stmt = $pdo->prepare("
-        SELECT dt.*, u.name AS assigned_by_name
-        FROM daily_tasks dt
-        LEFT JOIN users u ON u.id=dt.assigned_by
-        WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
-          AND (dt.target_field IS NULL OR dt.target_field=''
-               OR INSTR(LOWER(?), LOWER(dt.target_field)) > 0)
-          AND dt.task_date=CURDATE()
-        ORDER BY dt.id ASC
-    ");
-    $stmt->execute([$uid, $intern_field]);
+    if (empty($intern_field)) {
+        // Intern not yet assigned to a team — show all tasks for today
+        $stmt = $pdo->prepare("
+            SELECT dt.*, u.name AS assigned_by_name
+            FROM daily_tasks dt
+            LEFT JOIN users u ON u.id=dt.assigned_by
+            WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
+              AND dt.task_date=CURDATE()
+            ORDER BY dt.id ASC
+        ");
+        $stmt->execute([$uid]);
+    } else {
+        // INSTR match: target_field keyword must appear inside intern's team name
+        // e.g. target_field="AI" matches team="AI & ML Engineering"
+        $stmt = $pdo->prepare("
+            SELECT dt.*, u.name AS assigned_by_name
+            FROM daily_tasks dt
+            LEFT JOIN users u ON u.id=dt.assigned_by
+            WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
+              AND (dt.target_field IS NULL OR dt.target_field=''
+                   OR INSTR(LOWER(?), LOWER(dt.target_field)) > 0)
+              AND dt.task_date=CURDATE()
+            ORDER BY dt.id ASC
+        ");
+        $stmt->execute([$uid, $intern_field]);
+    }
 } else {
     $stmt = $pdo->query("
-        SELECT dt.*, u.name AS assigned_by_name
+        SELECT dt.*, u.name AS assigned_by_name,
+               YEARWEEK(dt.task_date, 1) AS iso_week,
+               DAYNAME(dt.task_date) AS day_name
         FROM daily_tasks dt LEFT JOIN users u ON u.id=dt.assigned_by
-        ORDER BY dt.task_date DESC, dt.id DESC
+        ORDER BY dt.task_date ASC, dt.target_field ASC, dt.id ASC
     ");
 }
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -450,7 +465,7 @@ $unlock_display = sprintf('%02d:%02d', (int)setting('daily_unlock_hour',9), (int
     <div class="char-avatar-wrap <?= $char_cls ?>" id="lock-char" style="margin-bottom:8px"><?= $char_svg ?></div>
     <div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)"><?= e($char_name) ?></div>
     <div class="speech-bubble" style="max-width:440px;border-radius:16px;text-align:left">
-      <div class="bubble-text" id="lock-bubble">Tasks unlock at <?= $unlock_display ?> sharp. Getting everything ready for you!</div>
+      <div class="bubble-text" id="lock-bubble">Tasks unlock at <strong><?= $unlock_display ?></strong> sharp. Getting everything ready for you!</div>
     </div>
     <div class="lock-label">New tasks available in</div>
     <div class="countdown-clock" id="countdown-clock">00:00:00</div>
@@ -525,9 +540,23 @@ $unlock_display = sprintf('%02d:%02d', (int)setting('daily_unlock_hour',9), (int
 <!-- ── No-tasks fallback ─────────────────── -->
 <div id="no-tasks-wrap" style="display:none" class="glass card-pad text-center py-5">
   <div class="char-avatar-wrap <?= $char_cls ?>" style="display:inline-block;margin-bottom:20px"><?= $char_svg ?></div>
-  <h4 class="serif" style="font-size:24px">No tasks scheduled for today</h4>
-  <p class="muted">Your mentor will assign tasks that appear here at <?= $unlock_display ?>.</p>
-  <div class="d-flex gap-2 justify-content-center mt-3">
+  <h4 class="serif" style="font-size:24px">No tasks for <?= e(date('l')) ?></h4>
+  <?php
+    // Check if there are upcoming tasks in the next 7 days to give a helpful hint
+    $upcoming_q = $pdo->prepare("SELECT MIN(task_date) FROM daily_tasks WHERE task_date > CURDATE() AND (assigned_to=? OR assigned_to IS NULL)");
+    $upcoming_q->execute([$uid]);
+    $next_date = $upcoming_q->fetchColumn();
+    $total_q   = $pdo->query("SELECT COUNT(*) FROM daily_tasks")->fetchColumn();
+  ?>
+  <?php if ($total_q == 0): ?>
+  <p class="muted">No tasks have been added yet. Your administrator will publish today's tasks before <?= $unlock_display ?>.</p>
+  <?php elseif ($next_date): ?>
+  <p class="muted">Today has no scheduled tasks. Your next tasks are on <strong><?= e(date('l, M j', strtotime($next_date))) ?></strong>.</p>
+  <?php else: ?>
+  <p class="muted">All caught up! No further tasks are scheduled this week.</p>
+  <?php endif; ?>
+  <div class="d-flex gap-2 justify-content-center mt-3 flex-wrap">
+    <a href="<?= base_url('intern/task_history.php') ?>" class="btn btn-primary"><i class="bi bi-calendar-week me-1"></i>Task History</a>
     <a href="<?= base_url('intern/board.php') ?>" class="btn btn-ghost"><i class="bi bi-kanban me-1"></i>My Board</a>
     <a href="<?= base_url('shared/materials.php') ?>" class="btn btn-ghost"><i class="bi bi-book me-1"></i>Materials</a>
   </div>
@@ -646,68 +675,117 @@ async function startWizard(eng) {
   <?php endif; ?>
 </div>
 
-<div class="row g-3">
-<?php foreach($tasks as $t):
-  $cps = $t['checkpoints'];
-  $stat_cls = ['done'=>'b-success','in_progress'=>'b-warning','pending'=>'b-muted'][$t['status']] ?? 'b-muted';
+<?php
+// Group tasks by week label + date for organised display
+$_domain_colors = [
+    'AI'=>'#60a5fa','Full Stack'=>'#34d399','Cyber'=>'#f87171',
+    'C++'=>'#a78bfa','QA'=>'#fbbf24','IoT'=>'#4ade80','Graphic'=>'#f472b6',
+];
+$_grouped = []; $_week_labels = [];
+foreach ($tasks as $t) {
+    $d  = $t['task_date'];
+    $wk = (int)date('W', strtotime($d));
+    $yr = (int)date('Y', strtotime($d));
+    $key = $yr . '-W' . str_pad($wk, 2, '0', STR_PAD_LEFT);
+    $_grouped[$key][$d][] = $t;
+    $_week_labels[$key] = 'Week ' . $wk . ' — ' . date('M j', strtotime('monday this week', strtotime($d))) . ' – ' . date('M j, Y', strtotime('sunday this week', strtotime($d)));
+}
+ksort($_grouped);
 ?>
-  <div class="col-md-6">
-    <div class="glass card-pad h-100">
-      <div class="d-flex justify-content-between align-items-start gap-2">
-        <div class="flex-grow-1 min-w-0">
-          <div class="small-cap mb-1">
-            <?= e(date('M j', strtotime($t['task_date']))) ?>
-            · <?= (int)$t['est_minutes'] ?> min
-            <?php if ($t['target_field']): ?> · <span class="badge b-info"><?= e($t['target_field']) ?></span><?php endif; ?>
+
+<?php if (!$tasks): ?>
+<div class="glass card-pad text-center muted py-4">
+  <i class="bi bi-calendar-x" style="font-size:40px;opacity:.4"></i>
+  <p class="mt-3">No tasks found. <a href="<?= base_url('mentor/assign_task.php') ?>">Assign one now</a> or <a href="<?= base_url('admin/import_daily_drop.php') ?>">import from Daily Drop</a>.</p>
+</div>
+<?php else: ?>
+<?php foreach ($_grouped as $week_key => $days_tasks):
+  $wl = $_week_labels[$week_key] ?? $week_key;
+?>
+<div class="mb-4">
+  <!-- Week header -->
+  <div class="d-flex align-items-center gap-3 mb-3" style="border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:10px">
+    <span style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--primary)">
+      <i class="bi bi-calendar-week me-2"></i><?= e($wl) ?>
+    </span>
+    <span style="font-size:11px;color:var(--muted)"><?= array_sum(array_map('count', $days_tasks)) ?> tasks</span>
+  </div>
+
+  <?php foreach ($days_tasks as $day_date => $day_tasks):
+    $day_dt  = new DateTime($day_date);
+    $is_today = ($day_date === date('Y-m-d'));
+    $day_num  = (int)$day_dt->format('N'); // 1=Mon…7=Sun
+    $day_name = $day_dt->format('l');      // Monday, Tuesday…
+    $day_theme = match($day_num) {
+        1 => 'Orientation & Setup',
+        2 => 'Foundation Building',
+        3 => 'Core Implementation',
+        4 => 'Integration & Testing',
+        5 => 'Review & Deploy',
+        default => 'Weekend',
+    };
+  ?>
+  <!-- Day group -->
+  <div class="mb-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span style="font-size:13px;font-weight:600;color:<?= $is_today ? '#60a5fa' : '#9ca3af' ?>">
+        <?= $is_today ? '<span class="badge bg-primary me-1" style="font-size:9px">TODAY</span>' : '' ?>
+        <?= e($day_dt->format('D, M j')) ?> &nbsp;·&nbsp; <?= e($day_name) ?>
+      </span>
+      <span style="font-size:11px;color:var(--muted);font-style:italic"><?= e($day_theme) ?></span>
+    </div>
+
+    <div class="row g-2">
+    <?php foreach ($day_tasks as $t):
+      $cps = $t['checkpoints'];
+      $stat_cls = ['done'=>'b-success','in_progress'=>'b-warning','pending'=>'b-muted'][$t['status']] ?? 'b-muted';
+      $fkey  = $t['target_field'] ?? '';
+      $fcolor = $_domain_colors[$fkey] ?? '#888';
+    ?>
+      <div class="col-md-6 col-xl-4">
+        <div class="glass card-pad h-100" style="border-left:3px solid <?= $fcolor ?>">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+            <div class="flex-grow-1 min-w-0">
+              <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
+                <?php if ($fkey): ?><span class="badge rounded-pill" style="background:<?= $fcolor ?>22;color:<?= $fcolor ?>;border:1px solid <?= $fcolor ?>44;font-size:10px"><?= e($fkey) ?></span><?php endif; ?>
+                <span class="muted" style="font-size:11px"><i class="bi bi-clock me-1"></i><?= (int)$t['est_minutes'] ?> min</span>
+              </div>
+              <h6 class="serif m-0" style="font-size:14px;line-height:1.3"><?= e($t['title']) ?></h6>
+            </div>
+            <span class="badge <?= $stat_cls ?> flex-shrink-0" style="font-size:10px"><?= e(ucfirst(str_replace('_',' ',$t['status']))) ?></span>
           </div>
-          <h5 class="serif m-0"><?= e($t['title']) ?></h5>
-          <p class="muted mt-1 mb-2" style="font-size:13px;white-space:pre-wrap"><?= e($t['description']) ?></p>
+
           <?php if ($t['video_url']): ?>
-          <a href="<?= e($t['video_url']) ?>" target="_blank" class="btn btn-ghost btn-sm mb-2"><i class="bi bi-play-circle me-1"></i>Resource video</a>
+          <a href="<?= e($t['video_url']) ?>" target="_blank" class="btn btn-ghost btn-sm py-0 px-1 mb-1" style="font-size:11px"><i class="bi bi-play-circle me-1"></i>Resource</a>
+          <?php endif; ?>
+          <?php if ($t['assigned_by_name']): ?>
+          <div class="muted mb-1" style="font-size:10px"><i class="bi bi-person me-1"></i><?= e($t['assigned_by_name']) ?></div>
+          <?php endif; ?>
+
+          <?php if ($cps): $done=count(array_filter($cps,fn($c)=>$c['done'])); $pct=round(($done/count($cps))*100); ?>
+            <div class="progress my-1" style="height:3px"><div class="progress-bar" style="width:<?= $pct ?>%"></div></div>
+            <div class="muted" style="font-size:10px"><?= $done ?>/<?= count($cps) ?> checkpoints</div>
+          <?php else: ?>
+            <form method="post" class="d-flex gap-1 mt-1">
+              <input type="hidden" name="action" value="set_status">
+              <input type="hidden" name="id" value="<?= (int)$t['id'] ?>">
+              <select class="form-select form-select-sm" name="status" style="font-size:11px">
+                <?php foreach(['pending','in_progress','done'] as $s): ?>
+                <option value="<?= $s ?>" <?= $t['status']===$s?'selected':'' ?>><?= ucfirst(str_replace('_',' ',$s)) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button class="btn btn-sm btn-primary" style="font-size:11px;white-space:nowrap">Save</button>
+            </form>
           <?php endif; ?>
         </div>
-        <span class="badge <?= $stat_cls ?> flex-shrink-0"><?= e(ucfirst(str_replace('_',' ',$t['status']))) ?></span>
       </div>
-
-      <?php if ($t['assigned_by_name']): ?>
-      <div class="muted mb-2" style="font-size:11px"><i class="bi bi-person me-1"></i>By <?= e($t['assigned_by_name']) ?></div>
-      <?php endif; ?>
-
-      <?php if ($cps): $done=count(array_filter($cps,fn($c)=>$c['done'])); $pct=round(($done/count($cps))*100); ?>
-        <div class="progress my-2"><div class="progress-bar" style="width:<?= $pct ?>%"></div></div>
-        <div class="muted mb-2" style="font-size:12px"><?= $done ?>/<?= count($cps) ?> checkpoints · due <?= e(date('M j', strtotime($t['due_date']))) ?></div>
-        <ul class="checklist p-0 mb-0">
-        <?php foreach($cps as $c): ?>
-          <li>
-            <form method="post" class="d-inline">
-              <input type="hidden" name="action" value="toggle_cp">
-              <input type="hidden" name="cp_id" value="<?= (int)$c['id'] ?>">
-              <input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>">
-              <button class="btn btn-sm btn-ghost p-0" type="submit"><i class="bi <?= $c['done']?'bi-check-circle-fill text-success':'bi-circle muted' ?>"></i></button>
-            </form>
-            <span class="<?= $c['done']?'muted text-decoration-line-through':'' ?>">Day <?= (int)$c['day_no'] ?>: <?= e($c['label']) ?></span>
-          </li>
-        <?php endforeach; ?>
-        </ul>
-      <?php else: ?>
-        <form method="post" class="d-flex gap-2 mt-2">
-          <input type="hidden" name="action" value="set_status">
-          <input type="hidden" name="id" value="<?= (int)$t['id'] ?>">
-          <select class="form-select form-select-sm" name="status">
-            <?php foreach(['pending','in_progress','done'] as $s): ?>
-            <option value="<?= $s ?>" <?= $t['status']===$s?'selected':'' ?>><?= ucfirst(str_replace('_',' ',$s)) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <button class="btn btn-sm btn-primary">Update</button>
-        </form>
-      <?php endif; ?>
+    <?php endforeach; ?>
     </div>
   </div>
-<?php endforeach; ?>
-<?php if (!$tasks): ?>
-  <div class="col-12"><div class="glass card-pad text-center muted py-4">No tasks found. <a href="<?= base_url('mentor/assign_task.php') ?>">Assign one now.</a></div></div>
-<?php endif; ?>
+  <?php endforeach; // days ?>
 </div>
+<?php endforeach; // weeks ?>
+<?php endif; ?>
 
 <?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

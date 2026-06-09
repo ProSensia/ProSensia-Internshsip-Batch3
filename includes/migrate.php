@@ -69,4 +69,19 @@ try {
     // PDF path for daily_tasks
     if (!col_exists($pdo,'daily_tasks','pdf_path'))
         run_silent($pdo,"ALTER TABLE daily_tasks ADD COLUMN pdf_path VARCHAR(255) NULL AFTER video_url");
+    // Materials library table
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS materials (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        kind ENUM('link','pdf','video') DEFAULT 'link',
+        url TEXT NOT NULL,
+        module VARCHAR(120),
+        meta VARCHAR(120),
+        team_id INT NULL,
+        posted_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(team_id), INDEX(posted_by)
+    ) ENGINE=InnoDB");
+    // UNIQUE key on daily_tasks so ON DUPLICATE KEY UPDATE works for idempotent imports
+    run_silent($pdo,"ALTER TABLE daily_tasks ADD UNIQUE KEY daily_tasks_slot (task_date, target_field(80), title(120))");
 } catch (Exception $e) {}

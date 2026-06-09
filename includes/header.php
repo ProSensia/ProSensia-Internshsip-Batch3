@@ -1,4 +1,7 @@
 <?php
+// Output buffering must start before any output so header() redirects work
+// even when this file is included after a page has already set up PHP state.
+if (!ob_get_level()) ob_start();
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/migrate.php';
 require_login();

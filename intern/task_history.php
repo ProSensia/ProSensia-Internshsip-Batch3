@@ -70,12 +70,16 @@ $sql_tasks = "
     SELECT
         dt.id, dt.title, dt.task_date, dt.target_field, dt.video_url,
         dt.est_minutes, dt.status AS task_status,
-        tpl.status AS done_status,
-        tpl.done_at,
+        tpl.new_status AS done_status,
+        tpl.changed_at AS done_at,
         tpl.user_id AS done_by_id
     FROM daily_tasks dt
     LEFT JOIN task_progress_log tpl
-           ON tpl.task_id = dt.id AND tpl.user_id = :uid
+           ON tpl.id = (
+               SELECT l.id FROM task_progress_log l
+               WHERE l.task_id = dt.id AND l.user_id = :uid_log
+               ORDER BY l.changed_at DESC LIMIT 1
+           )
     WHERE dt.task_date BETWEEN :start AND :end
       AND dt.status = 'active'
       AND (
@@ -86,7 +90,7 @@ $sql_tasks = "
     ORDER BY dt.task_date, dt.id
 ";
 $sth = $pdo->prepare($sql_tasks);
-$sth->execute([':uid'=>$filter_user, ':start'=>$month_start, ':end'=>$month_end, ':field'=>$intern_field]);
+$sth->execute([':uid_log'=>$filter_user, ':start'=>$month_start, ':end'=>$month_end, ':field'=>$intern_field]);
 $tasks_raw = $sth->fetchAll(PDO::FETCH_ASSOC);
 
 // ─────────────────────────────────────────────────────────────────────────────
