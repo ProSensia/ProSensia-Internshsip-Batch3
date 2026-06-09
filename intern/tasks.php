@@ -328,8 +328,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($a === 'check_in_inline') {
         $today = date('Y-m-d'); $now = date('H:i:s');
         $stat  = (int)date('G') >= 10 ? 'late' : 'present';
+        $already = $pdo->prepare('SELECT id FROM attendance WHERE user_id=? AND marked_on=?');
+        $already->execute([$uid, $today]); $is_new = !$already->fetchColumn();
         $pdo->prepare('INSERT INTO attendance(user_id,marked_on,status,check_in) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),check_in=COALESCE(check_in,VALUES(check_in))')
             ->execute([$uid, $today, $stat, $now]);
+        // Award XP for check-in (once per day)
+        if ($is_new) {
+            try {
+                $pdo->prepare('INSERT INTO xp_log(user_id,points,reason) VALUES(?,10,\'attendance\')')->execute([$uid]);
+            } catch (Exception $e) {}
+        }
     }
 
     // AJAX response
@@ -536,6 +544,8 @@ const PS_URLS        = {
   tasks:      <?= json_encode(base_url('intern/tasks.php')) ?>,
   attendance: <?= json_encode(base_url('shared/attendance.php')) ?>,
   socialPost: <?= json_encode(base_url('intern/social_post.php')) ?>,
+  xpAward:    <?= json_encode(base_url('shared/xp_award.php')) ?>,
+  leaderboard:<?= json_encode(base_url('intern/leaderboard.php')) ?>,
 };
 </script>
 <script src="<?= base_url('assets/js/characters.js') ?>"></script>

@@ -544,3 +544,311 @@
 .timeline-dot.done        { background: var(--success); }
 .timeline-dot.in_progress { background: var(--warning); }
 .timeline-dot.pending     { background: var(--muted); }
+
+
+/* ===================================================================
+   FEATURE: SMART DESCRIPTION FORMATTER (formatDesc)
+=================================================================== */
+.desc-rich { white-space: normal !important; }
+
+.desc-section-hdr {
+  display: flex; align-items: center; gap: 10px;
+  margin: 22px 0 10px;
+}
+.desc-section-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+.desc-section-title {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+
+.desc-time-block {
+  padding: 12px 16px; border-radius: 10px;
+  margin: 8px 0;
+}
+
+.desc-time-label {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 100px;
+  text-transform: uppercase; letter-spacing: .07em;
+}
+
+.desc-rules-hdr {
+  color: #fca5a5; font-weight: 700; font-size: 13px;
+  margin: 14px 0 6px; padding: 9px 14px;
+  background: rgba(239,68,68,.1);
+  border-left: 3px solid #ef4444;
+  border-radius: 0 8px 8px 0;
+}
+
+.desc-action-card {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 14px; border-radius: 10px;
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.06);
+  margin: 6px 0;
+}
+.desc-action-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: #000;
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.desc-action-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+}
+
+.desc-kv {
+  font-size: 13px; margin: 7px 0; line-height: 1.6;
+  padding: 6px 12px; background: rgba(96,165,250,.06);
+  border-radius: 8px; border-left: 2px solid rgba(96,165,250,.3);
+}
+.desc-kv-key {
+  font-weight: 700; color: #60a5fa;
+}
+
+.desc-list {
+  margin: 6px 0 10px; padding-left: 22px;
+}
+.desc-list li {
+  font-size: 13px; color: var(--text); opacity: .85;
+  margin-bottom: 5px; line-height: 1.65;
+}
+
+.desc-subhdr {
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); margin: 14px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.desc-p {
+  font-size: 13.5px; line-height: 1.75; color: var(--text);
+  opacity: .85; margin: 4px 0;
+}
+
+.desc-link {
+  color: #60a5fa; text-decoration: none;
+  border-bottom: 1px dotted rgba(96,165,250,.4);
+}
+.desc-link:hover { text-decoration: underline; color: #93c5fd; }
+
+.desc-pdf-viewer {
+  margin-top: 14px; padding: 12px 16px;
+  background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.2);
+  border-radius: 10px;
+}
+.desc-pdf-frame {
+  display: block; width: 100%; height: 480px;
+  border: 0; border-radius: 8px; margin-top: 10px;
+}
+
+
+/* ===================================================================
+   FEATURE: POMODORO FOCUS TIMER
+=================================================================== */
+@keyframes pom-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
+  50%     { box-shadow: 0 0 0 6px rgba(249,115,22,.15); }
+}
+
+.pom-strip {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  background: rgba(249,115,22,.07);
+  border-bottom: 1px solid rgba(249,115,22,.15);
+  border-top: 1px solid rgba(249,115,22,.1);
+  flex-wrap: wrap;
+}
+.pom-label {
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: #f97316; flex-shrink: 0;
+}
+.pom-time {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px; font-weight: 700;
+  color: var(--text); letter-spacing: 2px;
+  min-width: 64px; flex-shrink: 0;
+  transition: color .3s;
+}
+.pom-btn {
+  padding: 6px 14px; border-radius: 10px;
+  border: 1.5px solid rgba(249,115,22,.4);
+  background: rgba(249,115,22,.1); color: #f97316;
+  font-size: 13px; cursor: pointer; transition: all .18s;
+  margin-left: auto;
+}
+.pom-btn:hover { background: rgba(249,115,22,.2); }
+.pom-btn.pom-running {
+  border-color: rgba(239,68,68,.5);
+  background: rgba(239,68,68,.1); color: #f87171;
+  animation: pom-pulse 1.5s ease-in-out infinite;
+}
+
+
+/* ===================================================================
+   FEATURE: XP TOAST NOTIFICATION
+=================================================================== */
+@keyframes xp-fly {
+  0%   { transform: translateX(-50%) translateY(0);   opacity: 1; }
+  70%  { transform: translateX(-50%) translateY(-28px); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-45px); opacity: 0; }
+}
+
+.xp-toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(212,168,76,.14));
+  border: 1px solid rgba(251,191,36,.4);
+  border-radius: 100px; padding: 10px 22px;
+  font-size: 14px; font-weight: 700; color: #fde68a;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; z-index: 9999;
+  opacity: 0; transition: opacity .3s, transform .3s;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4), 0 0 0 1px rgba(251,191,36,.1);
+}
+.xp-toast.xp-toast-show {
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+
+
+/* ===================================================================
+   FEATURE: XP COMPLETION BADGE (on all-done screen)
+=================================================================== */
+.xp-completion-badge {
+  display: inline-flex; align-items: center;
+  background: linear-gradient(135deg, rgba(251,191,36,.2), rgba(212,168,76,.15));
+  border: 1.5px solid rgba(251,191,36,.4);
+  border-radius: 100px; padding: 10px 28px;
+  font-size: 16px; font-weight: 800; color: #fde68a;
+  margin: 14px 0;
+  box-shadow: 0 4px 20px rgba(251,191,36,.2);
+}
+.trophy-row { font-size: 44px; letter-spacing: 8px; }
+
+
+/* ===================================================================
+   FEATURE: LINKEDIN POST GENERATOR MODAL
+=================================================================== */
+@keyframes li-slide-in {
+  from { opacity:0; transform:translateY(20px) scale(.97); }
+  to   { opacity:1; transform:none; }
+}
+
+.li-post-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  z-index: 9200; display: flex; align-items: center;
+  justify-content: center; padding: 20px;
+  opacity: 0; transition: opacity .25s;
+}
+.li-post-modal.visible { opacity: 1; }
+.li-post-card {
+  background: var(--surface);
+  border: 1.5px solid rgba(10,102,194,.35);
+  border-radius: 22px; padding: 28px 28px 22px;
+  max-width: 560px; width: 100%;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  animation: li-slide-in .3s ease;
+}
+.li-post-hdr {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 16px;
+}
+.li-post-text {
+  width: 100%; border-radius: 12px;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.1);
+  color: var(--text); padding: 14px 16px;
+  font-size: 13px; line-height: 1.72; resize: vertical;
+  font-family: inherit; outline: none;
+  transition: border-color .2s;
+}
+.li-post-text:focus { border-color: rgba(10,102,194,.5); }
+
+
+/* ===================================================================
+   FEATURE: XP LEADERBOARD / LEVEL BADGE (used in header + leaderboard)
+=================================================================== */
+@keyframes level-shine {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.xp-level-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 14px; border-radius: 100px;
+  background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(212,168,76,.12));
+  border: 1px solid rgba(251,191,36,.3);
+  font-size: 12px; font-weight: 700; color: #fde68a;
+  cursor: pointer; text-decoration: none;
+  transition: all .2s;
+}
+.xp-level-chip:hover {
+  background: rgba(251,191,36,.25);
+  color: #fde68a; border-color: rgba(251,191,36,.5);
+}
+.xp-level-chip .xp-icon { color: #fbbf24; font-size: 13px; }
+.xp-lvl-bar-wrap {
+  height: 4px; background: rgba(255,255,255,.07);
+  border-radius: 2px; overflow: hidden; width: 60px;
+}
+.xp-lvl-bar-fill {
+  height: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 2px; transition: width .6s ease;
+}
+
+
+/* ===================================================================
+   FEATURE: CONTRIBUTION HEATMAP (GitHub-style)
+=================================================================== */
+.heatmap-grid {
+  display: flex; gap: 3px; overflow-x: auto;
+  padding-bottom: 8px;
+}
+.heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+.heatmap-cell {
+  width: 13px; height: 13px; border-radius: 3px;
+  background: rgba(255,255,255,.05);
+  transition: transform .15s;
+}
+.heatmap-cell:hover { transform: scale(1.4); }
+.heatmap-cell.h1 { background: rgba(34,197,94,.25); }
+.heatmap-cell.h2 { background: rgba(34,197,94,.45); }
+.heatmap-cell.h3 { background: rgba(34,197,94,.70); }
+.heatmap-cell.h4 { background: rgba(34,197,94,.95); }
+
+
+/* ===================================================================
+   FEATURE: LEADERBOARD PAGE STYLES
+=================================================================== */
+.lb-rank-badge {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; flex-shrink: 0;
+}
+.lb-rank-badge.r1 { background: linear-gradient(135deg,#fbbf24,#d97706); color:#000; box-shadow:0 4px 14px rgba(251,191,36,.4); }
+.lb-rank-badge.r2 { background: linear-gradient(135deg,#94a3b8,#64748b); color:#fff; }
+.lb-rank-badge.r3 { background: linear-gradient(135deg,#f97316,#c2410c); color:#fff; }
+.lb-rank-badge.rn { background: rgba(255,255,255,.06); color:var(--muted); }
+
+.lb-xp-bar-wrap {
+  height: 6px; background: rgba(255,255,255,.07);
+  border-radius: 3px; overflow: hidden; flex: 1;
+}
+.lb-xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 3px; transition: width .8s ease;
+}
+
+.badge-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 700;
+  background: rgba(167,139,250,.15); color: #c4b5fd;
+  border: 1px solid rgba(167,139,250,.25);
+}

@@ -184,6 +184,108 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 function pad2(n)   { return String(n).padStart(2,'0'); }
 function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Auto-link URLs while safely HTML-encoding surrounding text
+function autoLink(raw) {
+  const re = /https?:\/\/[^\s<>"']+/g;
+  let out = '', last = 0, m;
+  re.lastIndex = 0;
+  while ((m = re.exec(raw)) !== null) {
+    out += esc(raw.slice(last, m.index));
+    out += `<a href="${esc(m[0])}" target="_blank" rel="noopener" class="desc-link">${esc(m[0])}</a>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(raw.slice(last));
+}
+
+// Smart Daily Drop description formatter — parses Section A/B/C, time blocks, action items, bullets
+function formatDesc(raw) {
+  if (!raw || !raw.trim()) return '';
+  const SEC_C  = { a:'#60a5fa', b:'#34d399', c:'#fbbf24', d:'#c084fc' };
+  const BLK_S  = {
+    learning: { bg:'rgba(59,130,246,.12)',  border:'#3b82f6', icon:'bi-book-fill',    text:'#93c5fd', lbl:'Learning'  },
+    building: { bg:'rgba(34,197,94,.12)',   border:'#22c55e', icon:'bi-code-slash',    text:'#86efac', lbl:'Building'  },
+    hygiene:  { bg:'rgba(234,179,8,.12)',   border:'#eab308', icon:'bi-wrench-fill',   text:'#fde047', lbl:'Hygiene'   },
+    linkedin: { bg:'rgba(14,165,233,.12)',  border:'#0ea5e9', icon:'bi-linkedin',      text:'#7dd3fc', lbl:'LinkedIn'  },
+  };
+  const lines = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  let html = '', listType = '';
+  const endList = () => { if (listType) { html += `</${listType}>`; listType = ''; } };
+
+  for (const line of lines) {
+    const ln = line.trim();
+    if (!ln) { endList(); continue; }
+
+    // Section header: "Section A: Title"
+    const secM = ln.match(/^section\s+([a-d])\s*[:\-–]\s*(.*)/i);
+    if (secM) {
+      endList();
+      const ltr = secM[1].toLowerCase(), c = SEC_C[ltr] || '#60a5fa';
+      html += `<div class="desc-section-hdr"><span class="desc-section-badge" style="background:${c}1a;color:${c};border:1px solid ${c}40">${ltr.toUpperCase()}</span><span class="desc-section-title">${autoLink(secM[2].trim())}</span></div>`;
+      continue;
+    }
+
+    // Time block: "9:00 AM - 10:00 AM (Learning): optional text"
+    const tmM = ln.match(/^(\d{1,2}:\d{2}\s*[AP]M)\s*[-–]\s*(\d{1,2}:\d{2}\s*[AP]M)\s*\(([^)]+)\)\s*:?\s*(.*)/i);
+    if (tmM) {
+      endList();
+      const key = tmM[3].toLowerCase().trim();
+      const st = BLK_S[key] || { bg:'rgba(167,139,250,.12)', border:'#a78bfa', icon:'bi-clock', text:'#c4b5fd', lbl:tmM[3] };
+      const extra = tmM[4].trim() ? `<div style="font-size:12px;color:${st.text};opacity:.85;margin-top:5px">${autoLink(tmM[4].trim())}</div>` : '';
+      html += `<div class="desc-time-block" style="background:${st.bg};border-left:3px solid ${st.border}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><i class="bi ${st.icon}" style="color:${st.text}"></i><strong style="color:${st.text}">${esc(tmM[1])} – ${esc(tmM[2])}</strong><span class="desc-time-label" style="background:${st.border}1a;color:${st.text};border:1px solid ${st.border}40">${esc(st.lbl)}</span></div>${extra}</div>`;
+      continue;
+    }
+
+    // Non-negotiable rules header
+    if (/non[- ]?negotiable\s+rule/i.test(ln)) {
+      endList();
+      html += `<div class="desc-rules-hdr"><i class="bi bi-exclamation-triangle-fill me-2"></i>${autoLink(ln)}</div>`;
+      continue;
+    }
+
+    // Action item: "Action 1 (Label): text"
+    const actM = ln.match(/^action\s+(\d+)\s*\(([^)]+)\)\s*:?\s*(.*)/i);
+    if (actM) {
+      endList();
+      const rest = actM[3].trim() ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${autoLink(actM[3].trim())}</div>` : '';
+      html += `<div class="desc-action-card"><div class="desc-action-num">${esc(actM[1])}</div><div><div class="desc-action-title">${esc(actM[2])}</div>${rest}</div></div>`;
+      continue;
+    }
+
+    // Key-value: "Objective: ..."
+    const kvM = ln.match(/^(objective|goal|outcome|deliverable|focus|aim|target)\s*:\s*(.*)/i);
+    if (kvM) {
+      endList();
+      html += `<div class="desc-kv"><span class="desc-kv-key">${esc(kvM[1])}:</span> ${autoLink(kvM[2].trim())}</div>`;
+      continue;
+    }
+
+    // Bullet point
+    if (/^[•\-\*] /.test(ln)) {
+      if (listType !== 'ul') { endList(); html += '<ul class="desc-list">'; listType = 'ul'; }
+      html += `<li>${autoLink(ln.slice(2).trim())}</li>`;
+      continue;
+    }
+
+    // Numbered list
+    const numM = ln.match(/^(\d+)\.\s+(.*)/);
+    if (numM) {
+      if (listType !== 'ol') { endList(); html += '<ol class="desc-list">'; listType = 'ol'; }
+      html += `<li>${autoLink(numM[2])}</li>`;
+      continue;
+    }
+
+    // Short sub-heading (ends with ':', short, no comma)
+    endList();
+    if (ln.endsWith(':') && ln.length < 70 && !ln.includes(',') && (ln.match(/:/g)||[]).length === 1) {
+      html += `<div class="desc-subhdr">${autoLink(ln)}</div>`;
+    } else {
+      html += `<p class="desc-p">${autoLink(ln)}</p>`;
+    }
+  }
+  endList();
+  return html;
+}
+
 function _unlockHour() { return (typeof PS_UNLOCK_HOUR !== 'undefined') ? PS_UNLOCK_HOUR : 9; }
 function _unlockMin()  { return (typeof PS_UNLOCK_MIN  !== 'undefined') ? PS_UNLOCK_MIN  : 0; }
 function isUnlocked() {
@@ -384,12 +486,20 @@ class WizardController {
     h += '</div>';
     h += '</div>'; // /task-card-header
 
+    // ── Pomodoro Focus Timer strip ──
+    h += `<div class="pom-strip" id="pom-strip-${t.id}"><span class="pom-label"><i class="bi bi-stopwatch me-1"></i>Focus Timer</span><span class="pom-time" id="pom-t-${t.id}">25:00</span><button class="pom-btn" id="pom-b-${t.id}" onclick="pomToggle(${t.id})" title="Start 25-min Pomodoro"><i class="bi bi-play-fill"></i></button></div>`;
+
     // ── Body ──
     h += '<div class="task-card-body">';
 
     if (t.description && t.description.trim()) {
       h += '<div class="task-section-label"><i class="bi bi-file-text me-1"></i>Mission Brief</div>';
-      h += `<div class="task-description">${esc(t.description)}</div>`;
+      h += `<div class="task-description desc-rich">${formatDesc(t.description)}</div>`;
+    }
+
+    // Inline PDF viewer if pdf_path set
+    if (t.pdf_path) {
+      h += `<div class="desc-pdf-viewer"><i class="bi bi-file-earmark-pdf me-2" style="color:#ef4444"></i><a href="${esc(t.pdf_path)}" target="_blank" class="desc-link">View Task PDF</a> &nbsp;<iframe src="${esc(t.pdf_path)}" class="desc-pdf-frame" title="Task PDF"></iframe></div>`;
     }
 
     // Resources section
@@ -563,6 +673,13 @@ class WizardController {
       await fetch(this.urls.tasks || location.href, {
         method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}
       });
+      // Award XP for task completion
+      const xfd = new FormData();
+      xfd.append('points','50'); xfd.append('reason','task_complete'); xfd.append('task_id', task.id);
+      const xRes = await fetch((this.urls.xpAward || '../shared/xp_award.php'), {
+        method:'POST', body:xfd, headers:{'X-Requested-With':'XMLHttpRequest'}
+      }).catch(()=>null);
+      if (xRes) { const xd = await xRes.json().catch(()=>null); if (xd?.ok) xpToast(50, 'Task Complete!'); }
     } catch(e) { /* silent fail */ }
   }
 
@@ -571,24 +688,40 @@ class WizardController {
   _showCompletion() {
     const wrap = document.getElementById('wizard-wrap');
     if (!wrap) return;
+    const lastTask = this.tasks[this.tasks.length - 1] || {};
     wrap.innerHTML = `
       <div class="completion-screen glass card-pad">
         <span class="trophy-row">🏆🎉⭐</span>
         <h2 class="serif mt-3" style="font-size:32px">All Tasks Done!</h2>
-        <p class="muted">You've completed all tasks for today. Incredible work, ${esc(this.name)}!</p>
+        <p class="muted">Incredible work, ${esc(this.name)}! You crushed today's mission.</p>
+        <div class="xp-completion-badge">
+          <i class="bi bi-star-fill me-2" style="color:#fbbf24"></i>+150 XP Earned Today!
+        </div>
         <p class="muted" style="font-size:12px">Your mentor &amp; management have been notified. 🌟</p>
         <div class="d-flex gap-3 justify-content-center flex-wrap mt-4">
-          <a href="${esc(this.urls.socialPost||'#')}" class="btn btn-primary">
-            <i class="bi bi-linkedin me-2"></i>Share on LinkedIn
+          <button class="btn btn-primary" onclick="showLinkedInPost(${JSON.stringify(lastTask.title||'')},${JSON.stringify(lastTask.target_field||'')})">
+            <i class="bi bi-linkedin me-2"></i>Generate LinkedIn Post
+          </button>
+          <a href="${esc(this.urls.leaderboard||'../intern/leaderboard.php')}" class="btn btn-ghost">
+            <i class="bi bi-trophy me-2"></i>Leaderboard
           </a>
           <a href="${esc(this.urls.attendance||'#')}" class="btn btn-outline-light">
-            <i class="bi bi-box-arrow-right me-2"></i>Check Out &amp; Go
+            <i class="bi bi-box-arrow-right me-2"></i>Check Out
           </a>
         </div>
       </div>`;
     this.eng.celebrate();
     this.eng.say(this.eng.line('linkedin', this.name));
     this._launchConfetti();
+    // Award bonus XP for all-done milestone
+    try {
+      const xfd = new FormData();
+      xfd.append('points','100'); xfd.append('reason','all_tasks_done');
+      fetch(this.urls.xpAward || '../shared/xp_award.php', {
+        method:'POST', body:xfd, headers:{'X-Requested-With':'XMLHttpRequest'}
+      });
+      setTimeout(() => xpToast(100, 'All Done! Bonus XP!'), 1800);
+    } catch(e) {}
   }
 
   _launchConfetti() {
@@ -634,4 +767,68 @@ class WizardController {
       }
     });
   }
+}
+
+// ===== POMODORO FOCUS TIMER =====
+const _poms = {};
+function pomToggle(tid) {
+  const tEl = document.getElementById('pom-t-'+tid);
+  const bEl = document.getElementById('pom-b-'+tid);
+  if (!tEl || !bEl) return;
+  if (_poms[tid]) {
+    clearInterval(_poms[tid]);
+    delete _poms[tid];
+    tEl.textContent = '25:00'; tEl.style.color = '';
+    bEl.innerHTML = '<i class="bi bi-play-fill"></i>';
+    bEl.classList.remove('pom-running');
+    return;
+  }
+  let left = 25 * 60;
+  bEl.innerHTML = '<i class="bi bi-stop-fill"></i>';
+  bEl.classList.add('pom-running');
+  _poms[tid] = setInterval(() => {
+    left--;
+    const m = Math.floor(left/60), s = left % 60;
+    tEl.textContent = pad2(m)+':'+pad2(s);
+    if (left <= 300) tEl.style.color = '#f97316';
+    if (left <= 0) {
+      clearInterval(_poms[tid]);
+      delete _poms[tid];
+      tEl.textContent = 'Done! 🎉';
+      tEl.style.color = '#34d399';
+      bEl.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+      bEl.classList.remove('pom-running');
+      // Show XP reward for focus session
+      xpToast(10, 'Focus Session!');
+    }
+  }, 1000);
+}
+
+// ===== XP TOAST NOTIFICATION =====
+function xpToast(pts, label) {
+  const el = document.createElement('div');
+  el.className = 'xp-toast';
+  el.innerHTML = `<i class="bi bi-star-fill" style="color:#fbbf24;font-size:16px"></i>&nbsp;+${pts} XP &nbsp;<span style="opacity:.65;font-size:11px">${label||''}</span>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('xp-toast-show'), 30);
+  setTimeout(() => { el.classList.remove('xp-toast-show'); setTimeout(()=>el.remove(), 350); }, 2800);
+}
+
+// ===== LINKEDIN POST GENERATOR =====
+function showLinkedInPost(taskTitle, taskField) {
+  const field = taskField || 'Technology';
+  const tag   = field.replace(/\s+/g,'').replace(/[^a-zA-Z0-9]/g,'');
+  const date  = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const POSTS = [
+    `🚀 Day at ProSensia — ${date}\n\nToday I completed: "${taskTitle}"\n\nKey wins:\n✅ Hands-on implementation in ${field}\n✅ Pushed code to GitHub\n✅ Applied real-world engineering practices\n\nEvery structured day here builds my foundation. Grateful for the guidance! 💡\n\n#ProSensia #Internship #${tag} #Engineering #LearningEveryDay`,
+    `💡 Learning log from ProSensia!\n\nTask completed: "${taskTitle}" — ${field}\n\nWhat clicked today:\n• Theory → practice in a single focused session\n• Built something genuinely portfolio-worthy\n• Leveled up my ${field} expertise\n\nThe daily grind creates compounding skills. 📈\n\n#ProSensia #${tag} #TechInternship #GrowthMindset`,
+    `📚 Daily progress update — ProSensia internship\n\n"${taskTitle}" — ${field}\n\nToday's takeaway: structured learning + real implementation = actual skill growth.\n\nNot just watching tutorials. Actually building. 🔥\n\n#ProSensia #${tag} #InternLife #RealWorldSkills`,
+  ];
+  const post = POSTS[Math.floor(Math.random() * POSTS.length)];
+  const m = document.createElement('div');
+  m.className = 'li-post-modal';
+  m.innerHTML = `<div class="li-post-card"><div class="li-post-hdr"><i class="bi bi-linkedin" style="color:#0a66c2;font-size:22px"></i><div><div style="font-weight:700;font-size:15px">LinkedIn Post Ready!</div><div style="font-size:12px;color:var(--muted)">Edit it, copy &amp; paste on LinkedIn</div></div><button class="btn btn-ghost btn-sm ms-auto" style="font-size:20px;line-height:1" onclick="this.closest('.li-post-modal').remove()">&times;</button></div><textarea class="li-post-text" id="li-post-txt" rows="9">${post.replace(/</g,'&lt;')}</textarea><div class="d-flex gap-2 flex-wrap"><button class="btn btn-primary flex-grow-1" onclick='navigator.clipboard.writeText(document.getElementById("li-post-txt").value).then(()=>{this.innerHTML="<i class=\\"bi bi-check-lg me-1\\"></i>Copied!";setTimeout(()=>this.innerHTML="<i class=\\"bi bi-clipboard me-1\\"></i>Copy Text",2200)})'><i class="bi bi-clipboard me-1"></i>Copy Text</button><a href="https://www.linkedin.com/feed/" target="_blank" class="btn btn-outline-primary"><i class="bi bi-box-arrow-up-right me-1"></i>Open LinkedIn</a></div></div>`;
+  m.addEventListener('click', e=>{ if(e.target===m) m.remove(); });
+  document.body.appendChild(m);
+  setTimeout(()=>m.classList.add('visible'),30);
 }

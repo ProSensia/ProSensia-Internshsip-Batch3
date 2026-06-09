@@ -33,6 +33,7 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <div class="nav-section">Workspace</div>
   <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/enrollment.php','bi-journal-check','Enrollment'); endif; ?>
   <?php if (in_array($role,['intern','super_admin'],true)): nav_link('intern/profile.php','bi-person-vcard','Profile'); endif; ?>
+  <?php nav_link('intern/leaderboard.php','bi-trophy','Leaderboard'); ?>
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/tasks.php','bi-list-check','Daily Tasks', $_notif_counts['intern/tasks.php'] ?? 0); endif; ?>
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
   <?php nav_link('shared/team_board.php','bi-columns-gap','Team Board'); ?>

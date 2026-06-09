@@ -14,6 +14,31 @@ $asgStats->execute([$uid]); $st = $asgStats->fetch();
 $todayTasks = $pdo->prepare("SELECT * FROM daily_tasks WHERE (assigned_to=? OR assigned_to IS NULL) AND task_date=CURDATE() ORDER BY id DESC");
 $todayTasks->execute([$uid]); $tt = $todayTasks->fetchAll();
 $progress = $st['total'] ? round(($st['a']/$st['total'])*100) : 0;
+
+// XP + streak
+$_idx_xp = 0;
+try {
+    $xiq = $pdo->prepare('SELECT COALESCE(SUM(points),0) FROM xp_log WHERE user_id=?');
+    $xiq->execute([$uid]); $_idx_xp = (int)$xiq->fetchColumn();
+} catch(Exception $e) {}
+$_idx_streak = 0;
+try {
+    $siq = $pdo->prepare('SELECT current_streak FROM streaks WHERE user_id=?');
+    $siq->execute([$uid]); $_idx_streak = (int)($siq->fetchColumn() ?: 0);
+} catch(Exception $e) {}
+$xp_levels = [[0,200,'Apprentice','🌱'],[200,500,'Learner','📚'],[500,1000,'Builder','🔨'],[1000,2000,'Developer','💻'],[2000,4000,'Engineer','⚙️'],[4000,8000,'Senior','🚀'],[8000,15000,'Expert','🧠'],[15000,99999,'Elite','👑']];
+$_idx_lvl = 1; $_idx_title = 'Apprentice'; $_idx_icon = '🌱'; $_idx_pct = 0;
+foreach ($xp_levels as $i=>[$min,$max,$ttl,$ico]) {
+    if ($_idx_xp < $max || $i===count($xp_levels)-1) {
+        $_idx_lvl=$i+1; $_idx_title=$ttl; $_idx_icon=$ico;
+        $_idx_pct = $max>$min ? min(100,round(($_idx_xp-$min)/($max-$min)*100)) : 100;
+        break;
+    }
+}
+
+// Today's tasks done count
+$tasks_done_today = count(array_filter($tt, fn($t) => $t['status']==='done'));
+$tasks_total_today = count($tt);
 ?>
 <?php
 // First-login-of-day attendance check
@@ -143,6 +168,94 @@ document.addEventListener('DOMContentLoaded', function() {
       <a class="btn btn-outline-light text-start" href="<?= base_url('shared/messages.php') ?>"><i class="bi bi-chat-dots me-2"></i>Messages</a>
     </div>
   </div>
+
+  <!-- XP / Level card -->
+  <div class="span-4 glass card-pad" style="background:linear-gradient(135deg,rgba(212,168,76,.08),rgba(251,191,36,.04));border:1px solid rgba(212,168,76,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)">Your XP Level</div>
+        <div style="font-size:32px;font-weight:800;margin-top:4px"><?= $_idx_icon ?> L<?= $_idx_lvl ?></div>
+        <div style="font-size:13px;color:var(--muted)"><?= e($_idx_title) ?> · <?= number_format($_idx_xp) ?> XP</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:28px;color:#f97316;font-weight:800"><?= $_idx_streak ?></div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">🔥 Streak</div>
+      </div>
+    </div>
+    <div style="height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:<?= $_idx_pct ?>%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border-radius:4px;transition:width .8s ease"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+      <span>Level <?= $_idx_lvl ?></span>
+      <span><?= $_idx_pct ?>% to L<?= min(8,$_idx_lvl+1) ?></span>
+    </div>
+    <a href="<?= base_url('intern/leaderboard.php') ?>" class="btn btn-ghost btn-sm mt-3 w-100">
+      <i class="bi bi-trophy me-1"></i>View Leaderboard
+    </a>
+  </div>
+
+  <!-- Live Activity Feed -->
+  <div class="span-8 glass card-pad">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--primary)">
+        <i class="bi bi-activity me-2"></i>Team Activity Feed
+        <span class="feed-live-dot" id="feed-dot" title="Live" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#34d399;margin-left:6px;animation:led-pulse 1.5s infinite"></span>
+      </div>
+    </div>
+    <div id="activity-feed" style="max-height:220px;overflow-y:auto">
+      <div class="muted text-center py-3" style="font-size:13px" id="feed-placeholder">Connecting to live feed…</div>
+    </div>
+  </div>
+
 </div>
+
+<link rel="stylesheet" href="<?= base_url('assets/css/characters.css') ?>">
+<script>
+// Live activity feed via Server-Sent Events
+(function() {
+  const feedEl = document.getElementById('activity-feed');
+  const dotEl  = document.getElementById('feed-dot');
+  const placeholder = document.getElementById('feed-placeholder');
+  let lastId = 0;
+
+  function addFeedItem(icon, color, msg, time) {
+    if (placeholder) placeholder.remove();
+    const el = document.createElement('div');
+    el.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);animation:fadeUp .3s ease';
+    el.innerHTML = `<i class="bi ${icon}" style="color:${color};font-size:14px;margin-top:2px;flex-shrink:0"></i>
+      <span style="flex:1;font-size:12.5px;color:var(--text)">${msg}</span>
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0">${time}</span>`;
+    feedEl.insertBefore(el, feedEl.firstChild);
+    // Keep max 12 items
+    while (feedEl.children.length > 12) feedEl.removeChild(feedEl.lastChild);
+  }
+
+  if (typeof EventSource !== 'undefined') {
+    const src = new EventSource('<?= base_url('shared/activity_stream.php') ?>?last_id=' + lastId);
+
+    src.addEventListener('task_done', function(e) {
+      const d = JSON.parse(e.data);
+      lastId = Math.max(lastId, d.id || 0);
+      addFeedItem('bi-check-circle-fill','#34d399', `<strong>${d.name}</strong> completed <em>${d.task}</em>`, d.time);
+    });
+
+    src.addEventListener('check_in', function(e) {
+      const d = JSON.parse(e.data);
+      addFeedItem('bi-box-arrow-in-right','#60a5fa', `<strong>${d.name}</strong> checked in (${d.status})`, d.time);
+    });
+
+    src.addEventListener('ping', function() {
+      if (dotEl) { dotEl.style.background='#34d399'; setTimeout(()=>{ if(dotEl) dotEl.style.background='#34d399'; },300); }
+    });
+
+    src.onerror = function() {
+      if (dotEl) dotEl.style.background = '#ef4444';
+      if (placeholder && feedEl.children.length === 0) placeholder.textContent = 'Feed offline — refresh to reconnect';
+    };
+  } else {
+    if (placeholder) placeholder.textContent = 'Live feed not supported in this browser.';
+  }
+})();
+</script>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>

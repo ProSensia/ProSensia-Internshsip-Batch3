@@ -41,4 +41,32 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX(to_user_id), INDEX(read_at)
     ) ENGINE=InnoDB");
+    // Gamification: XP log
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS xp_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        points INT NOT NULL DEFAULT 0,
+        reason VARCHAR(60),
+        task_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(user_id), INDEX(created_at)
+    ) ENGINE=InnoDB");
+    // Gamification: badges
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS badges (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        badge_key VARCHAR(50) NOT NULL,
+        earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY badge_unique (user_id, badge_key)
+    ) ENGINE=InnoDB");
+    // Gamification: streaks
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS streaks (
+        user_id INT PRIMARY KEY,
+        current_streak INT DEFAULT 0,
+        longest_streak INT DEFAULT 0,
+        last_completed_date DATE NULL
+    ) ENGINE=InnoDB");
+    // PDF path for daily_tasks
+    if (!col_exists($pdo,'daily_tasks','pdf_path'))
+        run_silent($pdo,"ALTER TABLE daily_tasks ADD COLUMN pdf_path VARCHAR(255) NULL AFTER video_url");
 } catch (Exception $e) {}

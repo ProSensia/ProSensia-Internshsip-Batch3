@@ -1,0 +1,42 @@
+{
+  "name": "ProSensia Portal",
+  "short_name": "ProSensia",
+  "description": "ProSensia Internship Management Platform",
+  "start_url": "/intern/tasks.php",
+  "display": "standalone",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "assets/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Daily Tasks",
+      "short_name": "Tasks",
+      "description": "View and complete today's tasks",
+      "url": "/intern/tasks.php",
+      "icons": [{ "src": "assets/img/logo.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Leaderboard",
+      "short_name": "XP",
+      "description": "View XP rankings",
+      "url": "/intern/leaderboard.php",
+      "icons": [{ "src": "assets/img/logo.png", "sizes": "96x96" }]
+    }
+  ]
+}
