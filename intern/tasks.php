@@ -347,12 +347,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ─── Fetch tasks ──────────────────────────────────────────────────────
 if ($role === 'intern') {
+    // LIKE match: target_field is a keyword that must appear inside intern_field
+    // e.g.  target_field="AI"  matches  intern_field="AI & ML Engineering"
     $stmt = $pdo->prepare("
         SELECT dt.*, u.name AS assigned_by_name
         FROM daily_tasks dt
         LEFT JOIN users u ON u.id=dt.assigned_by
         WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
-          AND (dt.target_field IS NULL OR dt.target_field='' OR dt.target_field=?)
+          AND (dt.target_field IS NULL OR dt.target_field=''
+               OR INSTR(LOWER(?), LOWER(dt.target_field)) > 0)
           AND dt.task_date=CURDATE()
         ORDER BY dt.id ASC
     ");
