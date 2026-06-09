@@ -84,4 +84,7 @@ try {
     ) ENGINE=InnoDB");
     // UNIQUE key on daily_tasks so ON DUPLICATE KEY UPDATE works for idempotent imports
     run_silent($pdo,"ALTER TABLE daily_tasks ADD UNIQUE KEY daily_tasks_slot (task_date, target_field(80), title(120))");
+    // Ensure settings table exists and has default unlock time rows
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS settings (k VARCHAR(80) PRIMARY KEY, v TEXT) ENGINE=InnoDB");
+    run_silent($pdo,"INSERT IGNORE INTO settings(k,v) VALUES ('daily_unlock_hour','9'),('daily_unlock_min','0')");
 } catch (Exception $e) {}

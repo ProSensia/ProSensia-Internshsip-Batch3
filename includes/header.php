@@ -1,7 +1,11 @@
 <?php
-// Output buffering must start before any output so header() redirects work
-// even when this file is included after a page has already set up PHP state.
-if (!ob_get_level()) ob_start();
+// Always add an unlimited output buffer so header() redirects work even after
+// HTML output. If PHP's output_buffering ini is on (e.g. 4096 bytes), the
+// conditional form would skip our buffer, the limited ini-buffer would
+// auto-flush to the network before the POST handler fires, and Location:
+// redirects would silently fail. Unconditional ob_start() layers our
+// unlimited buffer on top — nothing reaches the wire until script end.
+ob_start();
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/migrate.php';
 require_login();
