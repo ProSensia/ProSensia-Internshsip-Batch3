@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $work_input !== '') {
     <div class="glass card-pad mb-3">
       <div class="d-flex gap-2 flex-wrap align-items-center">
         <span class="small-cap me-1">Share:</span>
-        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://prosensia.com" target="_blank" class="btn btn-sm" style="background:#0a66c2;color:white"><i class="bi bi-linkedin me-1"></i>LinkedIn</a>
+        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://prosensia.pk" target="_blank" class="btn btn-sm" style="background:#0a66c2;color:white"><i class="bi bi-linkedin me-1"></i>LinkedIn</a>
         <a href="https://twitter.com/intent/tweet?text=<?= urlencode(mb_substr(str_replace("\n",' ',$post_text),0,260)) ?>" target="_blank" class="btn btn-sm btn-outline-light"><i class="bi bi-twitter-x me-1"></i>X / Twitter</a>
       </div>
     </div>
@@ -325,7 +325,7 @@ function drawImage(logoImg) {
   ctx.font = '700 26px Inter, sans-serif';
   ctx.fillStyle = GOLD;
   ctx.textAlign = 'right';
-  ctx.fillText('prosensia.com', W - 72, H - 50);
+  ctx.fillText('prosensia.pk', W - 72, H - 50);
   ctx.font = '400 20px Inter, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.32)';
   ctx.fillText('AI · Tech · Innovation', W - 72, H - 24);
