@@ -38,7 +38,6 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/task_history.php','bi-calendar-week','Task History'); endif; ?>
   <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
   <?php nav_link('shared/team_board.php','bi-columns-gap','Team Board'); ?>
-  <?php if ($role==='mentor' || $role==='super_admin'): nav_link('mentor/assign_task.php','bi-plus-square','Assign Task'); endif; ?>
   <?php if (in_array($role,['mentor','super_admin','management'],true)): nav_link('mentor/daily_report.php','bi-bar-chart-line','Daily Report'); endif; ?>
   <?php if (in_array($role,['intern','super_admin','mentor'],true)): nav_link('intern/assignments.php','bi-clipboard-check','Assignments'); endif; ?>
   <?php nav_link('shared/materials.php','bi-book','Materials'); ?>

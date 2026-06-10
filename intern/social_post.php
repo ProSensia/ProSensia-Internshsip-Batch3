@@ -180,205 +180,179 @@ const POST_DATA = {
   date:        <?= json_encode(date('F j, Y')) ?>,
 };
 
-// Domain accent colours (match target_field keywords)
-const DOMAIN_COLORS = {
-  'AI':          '#60a5fa', 'Machine Learning': '#60a5fa',
-  'Full Stack':  '#34d399', 'Web':              '#34d399',
-  'Cyber':       '#f87171', 'Security':         '#f87171',
-  'C++':         '#a78bfa', 'Systems':          '#a78bfa',
-  'QA':          '#fbbf24', 'Testing':          '#fbbf24',
-  'IoT':         '#4ade80', 'Embedded':         '#4ade80',
-  'Graphic':     '#f472b6', 'Design':           '#f472b6',
-};
-function getAccent(field) {
-  for (const [k,v] of Object.entries(DOMAIN_COLORS)) {
-    if (field.toLowerCase().includes(k.toLowerCase())) return v;
-  }
-  return '#d4a84c'; // ProSensia gold
-}
+const LOGO_URL = <?= json_encode(logo_url()) ?>;
+const GOLD     = '#d4a84c';
+const GOLD_LT  = '#f0cc7a';
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(' ');
-  let line = '';
-  let lines = [];
+  let line = '', lines = [];
   for (const word of words) {
     const test = line + (line ? ' ' : '') + word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line); line = word;
-    } else line = test;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
+    else line = test;
   }
   if (line) lines.push(line);
   lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
   return lines.length;
 }
 
-function drawImage() {
+function drawImage(logoImg) {
   const canvas = document.getElementById('postCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const W = 1080, H = 1080;
-  const accent = getAccent(POST_DATA.field);
 
   ctx.clearRect(0, 0, W, H);
 
-  // ── Background gradient ──
-  const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-  bgGrad.addColorStop(0, '#080c14');
-  bgGrad.addColorStop(0.5, '#0d1525');
-  bgGrad.addColorStop(1, '#060a10');
-  ctx.fillStyle = bgGrad;
+  // ── Solid black background ──
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, W, H);
 
-  // ── Decorative corner glow ──
-  const glowTR = ctx.createRadialGradient(W, 0, 0, W, 0, 480);
-  glowTR.addColorStop(0, accent + '22');
-  glowTR.addColorStop(1, 'transparent');
-  ctx.fillStyle = glowTR;
-  ctx.fillRect(0, 0, W, H);
+  // ── Subtle gold corner glow ──
+  const glowTR = ctx.createRadialGradient(W, 0, 0, W, 0, 500);
+  glowTR.addColorStop(0, GOLD + '18'); glowTR.addColorStop(1, 'transparent');
+  ctx.fillStyle = glowTR; ctx.fillRect(0, 0, W, H);
+  const glowBL = ctx.createRadialGradient(0, H, 0, 0, H, 420);
+  glowBL.addColorStop(0, GOLD + '10'); glowBL.addColorStop(1, 'transparent');
+  ctx.fillStyle = glowBL; ctx.fillRect(0, 0, W, H);
 
-  const glowBL = ctx.createRadialGradient(0, H, 0, 0, H, 400);
-  glowBL.addColorStop(0, accent + '15');
-  glowBL.addColorStop(1, 'transparent');
-  ctx.fillStyle = glowBL;
-  ctx.fillRect(0, 0, W, H);
-
-  // ── Grid lines (subtle) ──
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  // ── Thin grid lines ──
+  ctx.strokeStyle = 'rgba(212,168,76,0.04)';
   ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 90) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
   for (let y = 0; y < H; y += 90) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
 
-  // ── Top accent bar ──
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, 0, W, 6);
+  // ── Top gold bar ──
+  const barGrad = ctx.createLinearGradient(0,0,W,0);
+  barGrad.addColorStop(0, GOLD); barGrad.addColorStop(1, GOLD_LT);
+  ctx.fillStyle = barGrad; ctx.fillRect(0, 0, W, 7);
 
-  // ── ProSensia branding top-left ──
-  ctx.font = '700 38px Inter, sans-serif';
-  ctx.fillStyle = accent;
-  ctx.fillText('ProSensia', 72, 80);
+  // ── ProSensia logo (top-left) ──
+  let logoEndX = 72;
+  if (logoImg && logoImg.naturalWidth > 0) {
+    const logoH = 54;
+    const logoW = Math.round(logoH * (logoImg.naturalWidth / logoImg.naturalHeight));
+    ctx.drawImage(logoImg, 72, 44, logoW, logoH);
+    logoEndX = 72 + logoW + 18;
+  }
+  ctx.font = '700 36px Inter, sans-serif';
+  ctx.fillStyle = GOLD;
+  ctx.fillText('ProSensia', logoEndX, 80);
+  ctx.font = '400 22px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('Internship Program', logoEndX, 110);
 
-  ctx.font = '400 26px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText('Internship Program', 72, 116);
-
-  // ── Domain badge (top-right) ──
-  const badge = POST_DATA.field.split(' ').slice(0,2).join(' ');
-  ctx.font = '600 22px Inter, sans-serif';
+  // ── Domain badge (top-right pill) ──
+  const badge = (POST_DATA.field || 'Intern').split(' ').slice(0,2).join(' ');
+  ctx.font = '600 20px Inter, sans-serif';
   const bw = ctx.measureText(badge).width + 40;
   const bx = W - bw - 72;
-  // pill background
-  ctx.fillStyle = accent + '22';
-  ctx.strokeStyle = accent + '88';
+  ctx.fillStyle = GOLD + '1a';
+  ctx.strokeStyle = GOLD + '80';
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(bx, 56, bw, 44, 22);
-  ctx.fill(); ctx.stroke();
-  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.roundRect(bx, 52, bw, 42, 21); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = GOLD_LT;
   ctx.textAlign = 'center';
-  ctx.fillText(badge, bx + bw/2, 85);
+  ctx.fillText(badge, bx + bw / 2, 81);
   ctx.textAlign = 'left';
 
-  // ── Divider line ──
-  ctx.strokeStyle = accent + '55';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(72, 148); ctx.lineTo(W - 72, 148); ctx.stroke();
+  // ── Gold divider ──
+  const divGrad = ctx.createLinearGradient(72, 0, W - 72, 0);
+  divGrad.addColorStop(0, GOLD + 'aa'); divGrad.addColorStop(1, 'transparent');
+  ctx.strokeStyle = divGrad; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(72, 140); ctx.lineTo(W - 72, 140); ctx.stroke();
 
   // ── Main headline ──
   const title = POST_DATA.title || 'Day at ProSensia';
-  ctx.font = 'bold 68px "Cormorant Garamond", Georgia, serif';
+  ctx.font = 'bold 62px "Cormorant Garamond", Georgia, serif';
   ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'left';
-  let hy = 240;
-  const numTitleLines = wrapText(ctx, title, 72, hy, W - 144, 80);
-  hy += numTitleLines * 80 + 20;
+  let hy = 228;
+  const numTitleLines = wrapText(ctx, title, 72, hy, W - 144, 74);
+  hy += numTitleLines * 74 + 18;
 
-  // ── Date chip ──
-  ctx.font = '500 26px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  // ── Date ──
+  ctx.font = '500 24px Inter, sans-serif';
+  ctx.fillStyle = GOLD + 'bb';
   ctx.fillText(POST_DATA.date, 72, hy);
-  hy += 56;
+  hy += 52;
 
   // ── Work description ──
-  ctx.font = '400 34px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  const numWorkLines = wrapText(ctx, POST_DATA.work, 72, hy, W - 144, 48);
-  hy += numWorkLines * 48 + 32;
+  ctx.font = '400 32px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  const numWorkLines = wrapText(ctx, POST_DATA.work, 72, hy, W - 144, 46);
+  hy += numWorkLines * 46 + 28;
 
   // ── Achievement block ──
   if (POST_DATA.achievement) {
-    ctx.fillStyle = accent + '18';
-    ctx.strokeStyle = accent + '66';
+    ctx.fillStyle = GOLD + '14';
+    ctx.strokeStyle = GOLD + '55';
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(60, hy - 12, W - 120, 68, 12);
-    ctx.fill(); ctx.stroke();
-    ctx.font = '600 28px Inter, sans-serif';
-    ctx.fillStyle = accent;
-    ctx.fillText('✅  ' + POST_DATA.achievement.slice(0, 62) + (POST_DATA.achievement.length > 62 ? '…' : ''), 80, hy + 36);
-    hy += 88;
+    ctx.beginPath(); ctx.roundRect(60, hy - 10, W - 120, 66, 10); ctx.fill(); ctx.stroke();
+    ctx.font = '600 26px Inter, sans-serif';
+    ctx.fillStyle = GOLD_LT;
+    ctx.fillText('✅  ' + POST_DATA.achievement.slice(0,64) + (POST_DATA.achievement.length > 64 ? '…' : ''), 80, hy + 34);
+    hy += 84;
   }
 
   // ── Repo link ──
   if (POST_DATA.repo) {
-    ctx.font = '500 24px Inter, sans-serif';
+    ctx.font = '500 22px Inter, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    const repoLabel = '🔗  ' + POST_DATA.repo.replace('https://', '').slice(0, 55) + (POST_DATA.repo.length > 60 ? '…' : '');
-    ctx.fillText(repoLabel, 72, hy);
-    hy += 44;
+    ctx.fillText('🔗  ' + POST_DATA.repo.replace('https://','').slice(0,58) + (POST_DATA.repo.length > 63 ? '…' : ''), 72, hy);
+    hy += 42;
   }
 
   // ── Hashtags ──
-  const htags = `#ProSensia  #Internship  #${POST_DATA.field.replace(/\s+/g,'')}  #BuildInPublic`;
-  ctx.font = '400 26px Inter, sans-serif';
-  ctx.fillStyle = accent + 'cc';
-  ctx.fillText(htags, 72, Math.max(hy + 20, H - 180));
+  ctx.font = '400 24px Inter, sans-serif';
+  ctx.fillStyle = GOLD + 'cc';
+  ctx.fillText('#ProSensia  #Internship  #' + (POST_DATA.field||'Tech').replace(/\s+/g,'') + '  #BuildInPublic', 72, Math.max(hy + 20, H - 180));
 
   // ── Bottom bar ──
-  ctx.fillStyle = accent + '18';
-  ctx.fillRect(0, H - 112, W, 112);
-  ctx.strokeStyle = accent + '44';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, H - 112); ctx.lineTo(W, H - 112); ctx.stroke();
+  const barBg = ctx.createLinearGradient(0, H - 110, 0, H);
+  barBg.addColorStop(0, GOLD + '22'); barBg.addColorStop(1, GOLD + '08');
+  ctx.fillStyle = barBg; ctx.fillRect(0, H - 110, W, 110);
+  ctx.strokeStyle = GOLD + '44'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H - 110); ctx.lineTo(W, H - 110); ctx.stroke();
 
-  // Name + handle on bottom left
-  ctx.font = '600 30px Inter, sans-serif';
+  ctx.font = '600 28px Inter, sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(POST_DATA.name, 72, H - 68);
-  ctx.font = '400 24px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText(POST_DATA.handle + '  ·  ProSensia Intern', 72, H - 36);
-
-  // ProSensia logo text bottom-right
-  ctx.font = '700 28px Inter, sans-serif';
-  ctx.fillStyle = accent;
-  ctx.textAlign = 'right';
-  ctx.fillText('prosensia.com', W - 72, H - 52);
+  ctx.fillText(POST_DATA.name, 72, H - 64);
   ctx.font = '400 22px Inter, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('AI · Tech · Innovation', W - 72, H - 26);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText(POST_DATA.handle + '  ·  ProSensia Intern', 72, H - 34);
+
+  ctx.font = '700 26px Inter, sans-serif';
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'right';
+  ctx.fillText('prosensia.com', W - 72, H - 50);
+  ctx.font = '400 20px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  ctx.fillText('AI · Tech · Innovation', W - 72, H - 24);
   ctx.textAlign = 'left';
 }
 
-function regenerateImage() { drawImage(); }
+function loadAndDraw() {
+  const img = new Image();
+  img.onload  = () => drawImage(img);
+  img.onerror = () => drawImage(null);
+  img.src = LOGO_URL;
+}
+
+function regenerateImage() { loadAndDraw(); }
 
 function downloadImage() {
   const canvas = document.getElementById('postCanvas');
   if (!canvas) return;
   const a = document.createElement('a');
-  const safeName = (POST_DATA.name.replace(/\s+/g,'_') + '_ProSensia_' + new Date().toISOString().slice(0,10)).toLowerCase();
-  a.download = safeName + '.png';
+  a.download = (POST_DATA.name.replace(/\s+/g,'_') + '_ProSensia_' + new Date().toISOString().slice(0,10)).toLowerCase() + '.png';
   a.href = canvas.toDataURL('image/png');
   a.click();
 }
 
-// Draw on load
 document.addEventListener('DOMContentLoaded', function() {
-  // Wait a tick for fonts to load
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(drawImage);
-  } else {
-    setTimeout(drawImage, 200);
-  }
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(loadAndDraw); }
+  else { setTimeout(loadAndDraw, 200); }
 });
 <?php endif; ?>
 </script>

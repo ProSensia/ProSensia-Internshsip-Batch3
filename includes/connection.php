@@ -18,6 +18,11 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
+    // Align MySQL timezone with PHP (Asia/Karachi = UTC+5).
+    // Without this, CURDATE() returns the UTC date which differs from
+    // PHP's date('Y-m-d') during the 5-hour overlap — tasks imported
+    // for today's Karachi date are invisible until the UTC day rolls over.
+    $pdo->exec("SET time_zone = '+05:00'");
 } catch (PDOException $e) {
     die('<div style="font-family:system-ui;padding:24px;background:#1a0a0a;color:#fca5a5;border-radius:8px;margin:24px;">
         <h2>Database connection failed</h2>

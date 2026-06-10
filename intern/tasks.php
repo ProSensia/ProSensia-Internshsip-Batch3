@@ -332,11 +332,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $already->execute([$uid, $today]); $is_new = !$already->fetchColumn();
         $pdo->prepare('INSERT INTO attendance(user_id,marked_on,status,check_in) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE status=VALUES(status),check_in=COALESCE(check_in,VALUES(check_in))')
             ->execute([$uid, $today, $stat, $now]);
-        // Award XP for check-in (once per day)
         if ($is_new) {
+            try { $pdo->prepare('INSERT INTO xp_log(user_id,points,reason) VALUES(?,10,\'attendance\')')->execute([$uid]); } catch (Exception $e) {}
+        }
+    } elseif ($a === 'submit_link') {
+        $task_id = (int)$_POST['task_id'];
+        $url     = trim($_POST['submission_url'] ?? '');
+        $today   = date('Y-m-d');
+        if ($task_id > 0 && $url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
             try {
-                $pdo->prepare('INSERT INTO xp_log(user_id,points,reason) VALUES(?,10,\'attendance\')')->execute([$uid]);
-            } catch (Exception $e) {}
+                $exists = $pdo->prepare('SELECT id FROM task_submissions WHERE task_id=? AND user_id=? AND submitted_date=?');
+                $exists->execute([$task_id, $uid, $today]); $is_first = !$exists->fetchColumn();
+                $pdo->prepare('INSERT INTO task_submissions(task_id,user_id,submission_url,marks,submitted_date) VALUES(?,?,?,10,?) ON DUPLICATE KEY UPDATE submission_url=VALUES(submission_url),submitted_at=NOW()')
+                    ->execute([$task_id, $uid, $url, $today]);
+                if ($is_first) {
+                    $pdo->prepare('INSERT INTO xp_log(user_id,points,reason,task_id) VALUES(?,10,\'submission\',?)')->execute([$uid, $task_id]);
+                }
+                flash('Link submitted! 10 marks awarded.');
+            } catch (Exception $e) { flash('Could not save submission.'); }
+        } else {
+            flash('Please enter a valid URL.');
+        }
+    } elseif ($a === 'submit_linkedin') {
+        $url   = trim($_POST['linkedin_url'] ?? '');
+        $today = date('Y-m-d');
+        if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
+            try {
+                $exists = $pdo->prepare('SELECT id FROM task_submissions WHERE task_id=0 AND user_id=? AND submitted_date=?');
+                $exists->execute([$uid, $today]); $is_first = !$exists->fetchColumn();
+                $pdo->prepare('INSERT INTO task_submissions(task_id,user_id,submission_url,marks,submitted_date) VALUES(0,?,?,10,?) ON DUPLICATE KEY UPDATE submission_url=VALUES(submission_url),submitted_at=NOW()')
+                    ->execute([$uid, $url, $today]);
+                if ($is_first) {
+                    $pdo->prepare('INSERT INTO xp_log(user_id,points,reason) VALUES(?,10,\'linkedin_post\')')->execute([$uid]);
+                }
+                flash('LinkedIn post submitted! 10 marks awarded.');
+            } catch (Exception $e) { flash('Could not save submission.'); }
+        } else {
+            flash('Please enter a valid LinkedIn URL.');
         }
     }
 
@@ -346,18 +378,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ─── Fetch tasks ──────────────────────────────────────────────────────
+$today_php = date('Y-m-d');
 if ($role === 'intern') {
     if (empty($intern_field)) {
-        // Intern not yet assigned to a team — show all tasks for today
         $stmt = $pdo->prepare("
             SELECT dt.*, u.name AS assigned_by_name
             FROM daily_tasks dt
             LEFT JOIN users u ON u.id=dt.assigned_by
             WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
-              AND dt.task_date=CURDATE()
+              AND dt.task_date=?
             ORDER BY dt.id ASC
         ");
-        $stmt->execute([$uid]);
+        $stmt->execute([$uid, $today_php]);
     } else {
         // INSTR match: target_field keyword must appear inside intern's team name
         // e.g. target_field="AI" matches team="AI & ML Engineering"
@@ -368,10 +400,10 @@ if ($role === 'intern') {
             WHERE (dt.assigned_to=? OR dt.assigned_to IS NULL)
               AND (dt.target_field IS NULL OR dt.target_field=''
                    OR INSTR(LOWER(?), LOWER(dt.target_field)) > 0)
-              AND dt.task_date=CURDATE()
+              AND dt.task_date=?
             ORDER BY dt.id ASC
         ");
-        $stmt->execute([$uid, $intern_field]);
+        $stmt->execute([$uid, $intern_field, $today_php]);
     }
 } else {
     $stmt = $pdo->query("
@@ -408,11 +440,21 @@ try {
     $nc->execute([$uid]); $notif_count = (int)$nc->fetchColumn();
 } catch (Exception $e) {}
 
-// ─── Upcoming tasks (tomorrow) for non-intern or sidebar hint ────────
+// ─── Upcoming tasks count + submissions for intern view ─────────────
 $tomorrow_count = 0;
+$my_submissions = [];
+$linkedin_sub   = null;
 if ($role === 'intern') {
-    $tc = $pdo->prepare("SELECT COUNT(*) FROM daily_tasks WHERE (assigned_to=? OR assigned_to IS NULL) AND task_date=DATE_ADD(CURDATE(),INTERVAL 1 DAY)");
-    $tc->execute([$uid]); $tomorrow_count = (int)$tc->fetchColumn();
+    $tc = $pdo->prepare("SELECT COUNT(*) FROM daily_tasks WHERE (assigned_to=? OR assigned_to IS NULL) AND task_date=?");
+    $tc->execute([$uid, date('Y-m-d', strtotime('+1 day'))]); $tomorrow_count = (int)$tc->fetchColumn();
+    // Fetch today's submitted links (task_id=0 means LinkedIn post)
+    try {
+        $sub_q = $pdo->prepare("SELECT task_id, submission_url, marks FROM task_submissions WHERE user_id=? AND submitted_date=?");
+        $sub_q->execute([$uid, $today_php]);
+        foreach ($sub_q->fetchAll() as $s) { $my_submissions[(int)$s['task_id']] = $s; }
+        $linkedin_sub = $my_submissions[0] ?? null;
+        unset($my_submissions[0]);
+    } catch (Exception $_e) {}
 }
 ?>
 
@@ -542,14 +584,15 @@ $unlock_display = sprintf('%02d:%02d', (int)setting('daily_unlock_hour',9), (int
   <div class="char-avatar-wrap <?= $char_cls ?>" style="display:inline-block;margin-bottom:20px"><?= $char_svg ?></div>
   <h4 class="serif" style="font-size:24px">No tasks for <?= e(date('l')) ?></h4>
   <?php
-    // Check if there are upcoming tasks in the next 7 days to give a helpful hint
-    $upcoming_q = $pdo->prepare("SELECT MIN(task_date) FROM daily_tasks WHERE task_date > CURDATE() AND (assigned_to=? OR assigned_to IS NULL)");
-    $upcoming_q->execute([$uid]);
+    $upcoming_q = $pdo->prepare("SELECT MIN(task_date) FROM daily_tasks WHERE task_date > ? AND (assigned_to=? OR assigned_to IS NULL)");
+    $upcoming_q->execute([$today_php, $uid]);
     $next_date = $upcoming_q->fetchColumn();
     $total_q   = $pdo->query("SELECT COUNT(*) FROM daily_tasks")->fetchColumn();
   ?>
   <?php if ($total_q == 0): ?>
   <p class="muted">No tasks have been added yet. Your administrator will publish today's tasks before <?= $unlock_display ?>.</p>
+  <?php elseif ($next_date && $next_date === $today_php): ?>
+  <p class="muted">Tasks exist for today but may not match your domain yet. Try refreshing or contact your mentor.</p>
   <?php elseif ($next_date): ?>
   <p class="muted">Today has no scheduled tasks. Your next tasks are on <strong><?= e(date('l, M j', strtotime($next_date))) ?></strong>.</p>
   <?php else: ?>
@@ -561,6 +604,134 @@ $unlock_display = sprintf('%02d:%02d', (int)setting('daily_unlock_hour',9), (int
     <a href="<?= base_url('shared/materials.php') ?>" class="btn btn-ghost"><i class="bi bi-book me-1"></i>Materials</a>
   </div>
 </div>
+
+<!-- ── Submit Work Links ─────────────────────────────────────────── -->
+<div id="submission-section" style="display:none" class="mt-4">
+  <div class="glass card-pad">
+    <h5 class="serif mb-1"><i class="bi bi-link-45deg me-2" style="color:var(--primary-glow)"></i>Submit Your Work Links</h5>
+    <p class="muted mb-3" style="font-size:13px">Paste a GitHub repo, Figma link, or live URL for each task. Each counts <strong>10 marks</strong>.</p>
+    <?php if (!empty($tasks)): ?>
+    <div class="row g-2">
+    <?php foreach ($tasks as $t):
+      $sub = $my_submissions[(int)$t['id']] ?? null; ?>
+      <div class="col-md-6">
+        <div class="glass p-3" style="border-radius:12px;border:1px solid rgba(255,255,255,.08)">
+          <div class="small-cap mb-1" style="font-size:10px;color:var(--primary)"><?= e($t['target_field'] ?: 'General') ?></div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px"><?= e($t['title']) ?></div>
+          <?php if ($sub): ?>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge b-success"><i class="bi bi-check2 me-1"></i>Submitted</span>
+            <a href="<?= e($sub['submission_url']) ?>" target="_blank" class="muted" style="font-size:11px;word-break:break-all"><?= e(substr($sub['submission_url'],0,40)).(strlen($sub['submission_url'])>40?'…':'') ?></a>
+            <span class="badge b-primary ms-auto">+<?= (int)$sub['marks'] ?> marks</span>
+          </div>
+          <?php else: ?>
+          <form method="post" class="d-flex gap-1">
+            <input type="hidden" name="action" value="submit_link">
+            <input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>">
+            <input class="form-control form-control-sm flex-grow-1" name="submission_url" placeholder="https://github.com/…" required>
+            <button class="btn btn-sm btn-primary" style="white-space:nowrap"><i class="bi bi-send"></i></button>
+          </form>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    </div>
+    <?php else: ?>
+    <p class="muted mb-0" style="font-size:13px">Complete today's tasks to unlock submission links.</p>
+    <?php endif; ?>
+    <?php
+      $total_marks = array_sum(array_column($my_submissions, 'marks'));
+      if ($linkedin_sub) $total_marks += (int)($linkedin_sub['marks'] ?? 10);
+      if ($total_marks > 0): ?>
+    <div class="mt-3 p-3 glass" style="border-radius:10px;border:1px solid var(--primary)33">
+      <span class="small-cap" style="color:var(--primary)">Today's marks earned:</span>
+      <span style="font-size:22px;font-weight:700;color:var(--primary-glow);margin-left:10px"><?= $total_marks ?></span>
+      <span class="muted" style="font-size:12px"> / <?= (count($tasks) + 1) * 10 ?> possible</span>
+    </div>
+    <?php endif; ?>
+  </div>
+</div>
+
+<!-- ── LinkedIn Daily Post Task ──────────────────────────────────── -->
+<div id="linkedin-task-section" style="display:none" class="mt-3">
+  <div class="glass card-pad" style="border-left:3px solid #0a66c2">
+    <div class="d-flex gap-3 align-items-start mb-3">
+      <i class="bi bi-linkedin" style="font-size:28px;color:#0a66c2;flex-shrink:0"></i>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h6 class="serif mb-0">Daily LinkedIn Post</h6>
+          <span class="badge b-primary">+10 marks</span>
+          <span class="badge b-muted" style="font-size:10px">Extra Task</span>
+        </div>
+        <p class="muted mb-0 mt-1" style="font-size:13px">Share your daily work on LinkedIn to build your professional brand. Paste the post URL below to earn 10 marks.</p>
+      </div>
+    </div>
+    <?php if ($linkedin_sub): ?>
+    <div class="alert alert-success py-2 mb-0" style="border-radius:8px">
+      <i class="bi bi-check-circle-fill me-2"></i>Submitted today!
+      <a href="<?= e($linkedin_sub['submission_url']) ?>" target="_blank" class="ms-2" style="color:inherit">View post <i class="bi bi-box-arrow-up-right"></i></a>
+      <span class="badge b-success ms-2">+10 marks</span>
+    </div>
+    <?php else: ?>
+    <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+      <a href="<?= base_url('intern/social_post.php') ?>" class="btn btn-sm btn-ghost" target="_blank">
+        <i class="bi bi-megaphone me-1"></i>Generate post image first
+      </a>
+    </div>
+    <form method="post" class="d-flex gap-2">
+      <input type="hidden" name="action" value="submit_linkedin">
+      <input class="form-control flex-grow-1" name="linkedin_url" placeholder="https://www.linkedin.com/posts/…" required>
+      <button class="btn btn-primary" style="white-space:nowrap"><i class="bi bi-send me-1"></i>Submit</button>
+    </form>
+    <?php endif; ?>
+  </div>
+</div>
+
+<?php
+// ── Upcoming tasks preview for interns ───────────────────────────────
+$upcoming_days = [];
+if ($role === 'intern') {
+    try {
+        $uq = $pdo->prepare("
+            SELECT task_date, COUNT(*) as cnt,
+                   GROUP_CONCAT(DISTINCT target_field ORDER BY target_field SEPARATOR ', ') as fields
+            FROM daily_tasks
+            WHERE task_date > ? AND (assigned_to=? OR assigned_to IS NULL)
+              AND status='active'
+              AND (target_field IS NULL OR target_field=''
+                   OR INSTR(LOWER(?), LOWER(target_field)) > 0)
+            GROUP BY task_date ORDER BY task_date ASC LIMIT 5
+        ");
+        $uq->execute([$today_php, $uid, $intern_field]);
+        $upcoming_days = $uq->fetchAll();
+    } catch (Exception $_e) {}
+}
+?>
+<?php if (!empty($upcoming_days)): ?>
+<div id="upcoming-section" class="mt-3">
+  <div class="glass card-pad" style="border-left:3px solid rgba(212,168,76,.4)">
+    <h6 class="serif mb-3"><i class="bi bi-calendar-plus me-2" style="color:var(--primary-glow)"></i>Upcoming Tasks</h6>
+    <div class="d-flex flex-column gap-2">
+    <?php foreach ($upcoming_days as $ud):
+      $ud_dt = new DateTime($ud['task_date']);
+      $is_tmrw = ($ud['task_date'] === date('Y-m-d', strtotime('+1 day')));
+    ?>
+      <div class="d-flex align-items-center gap-3 p-2" style="border-radius:8px;background:rgba(255,255,255,.03)">
+        <div style="min-width:48px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--primary-glow)"><?= $ud_dt->format('j') ?></div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase"><?= $ud_dt->format('M') ?></div>
+        </div>
+        <div class="flex-grow-1">
+          <div style="font-size:13px;font-weight:600"><?= $ud_dt->format('l') ?> <?= $is_tmrw ? '<span class="badge b-info" style="font-size:9px">Tomorrow</span>' : '' ?></div>
+          <div class="muted" style="font-size:11px"><?= (int)$ud['cnt'] ?> task<?= (int)$ud['cnt'] !== 1 ? 's' : '' ?><?= $ud['fields'] ? ' · ' . e($ud['fields']) : '' ?></div>
+        </div>
+        <i class="bi bi-chevron-right muted"></i>
+      </div>
+    <?php endforeach; ?>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- ═══ JAVASCRIPT ══════════════════════════════════════════════════ -->
 <script>
@@ -647,11 +818,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function startWizard(eng) {
   if (!PS_TASKS.length) {
     document.getElementById('no-tasks-wrap').style.display = '';
-    return;
+  } else {
+    document.getElementById('wizard-wrap').style.display = '';
+    const wiz = new WizardController(eng, PS_TASKS, PS_NAME, PS_URLS);
+    await wiz.start();
   }
-  document.getElementById('wizard-wrap').style.display = '';
-  const wiz = new WizardController(eng, PS_TASKS, PS_NAME, PS_URLS);
-  await wiz.start();
+  // Always show submission + LinkedIn sections for interns
+  const ss = document.getElementById('submission-section');
+  const li = document.getElementById('linkedin-task-section');
+  if (ss) ss.style.display = '';
+  if (li) li.style.display = '';
 }
 </script>
 
@@ -667,7 +843,7 @@ async function startWizard(eng) {
   </div>
   <?php if (in_array($role,['mentor','super_admin','management'],true)): ?>
   <div class="d-flex gap-2">
-    <a class="btn btn-primary" href="<?= base_url('mentor/assign_task.php') ?>"><i class="bi bi-plus-lg me-1"></i>Assign task</a>
+    <a class="btn btn-primary" href="<?= base_url('admin/import_daily_drop.php') ?>"><i class="bi bi-cloud-arrow-up me-1"></i>Import Daily Drop</a>
     <?php if ($role==='super_admin'): ?>
     <a class="btn btn-ghost" href="<?= base_url('admin/task_log.php') ?>"><i class="bi bi-clock-history me-1"></i>Version Log</a>
     <?php endif; ?>
@@ -696,7 +872,7 @@ ksort($_grouped);
 <?php if (!$tasks): ?>
 <div class="glass card-pad text-center muted py-4">
   <i class="bi bi-calendar-x" style="font-size:40px;opacity:.4"></i>
-  <p class="mt-3">No tasks found. <a href="<?= base_url('mentor/assign_task.php') ?>">Assign one now</a> or <a href="<?= base_url('admin/import_daily_drop.php') ?>">import from Daily Drop</a>.</p>
+  <p class="mt-3">No tasks found. <a href="<?= base_url('admin/import_daily_drop.php') ?>">Import from Daily Drop</a> to publish tasks for your interns.</p>
 </div>
 <?php else: ?>
 <?php foreach ($_grouped as $week_key => $days_tasks):
