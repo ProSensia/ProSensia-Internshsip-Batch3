@@ -120,7 +120,7 @@ $pdf->SetY(14);
 
 // Partner (PAF-IAST) logo — LEFT side
 if ($partnerLogo) {
-    $pdf->Image($partnerLogo, 15, 14, 32);
+    $pdf->Image($partnerLogo, 15, 15, 25);
 } else {
     $pdf->SetXY(15, 14);
     $pdf->SetFont('Helvetica', 'B', 9);
@@ -281,7 +281,7 @@ $pdf->Rect($approvalBoxX, $approvalBoxY, $approvalBoxW, $approvalBoxH);
 // QR inside box
 if ($qrFile && file_exists($qrFile)) {
     $qrW = 28;
-    $qrX = $approvalBoxX + ($approvalBoxW - $qrW) / 2 - 8;
+    $qrX = $approvalBoxX + ($approvalBoxW - $qrW) / 2;
     $pdf->Image($qrFile, $qrX, $approvalBoxY + 2, $qrW);
     $pdf->SetXY($approvalBoxX, $approvalBoxY + $qrW + 4);
     $pdf->SetFont('Helvetica','I',6);
