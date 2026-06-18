@@ -107,3 +107,52 @@ function avatar_html($u, $size = 36) {
 
 function founder_name() { return 'Momin Khan'; }
 function founder_title() { return 'Founder / Director / CEO'; }
+
+function _default_perms(): array {
+    static $d = null;
+    if ($d !== null) return $d;
+    return $d = [
+        'intern/tasks.php'             => ['intern','super_admin','mentor','management'],
+        'intern/task_history.php'      => ['intern','super_admin','mentor','management'],
+        'intern/board.php'             => ['intern','super_admin','mentor','management'],
+        'intern/leaderboard.php'       => ['intern','super_admin','mentor','management'],
+        'intern/social_post.php'       => ['intern'],
+        'intern/assignments.php'       => ['intern','super_admin','mentor'],
+        'intern/motivation.php'        => ['intern','super_admin'],
+        'intern/formc.php'             => ['intern','super_admin','management'],
+        'intern/enrollment.php'        => ['intern','super_admin','management'],
+        'intern/profile.php'           => ['intern','super_admin'],
+        'shared/materials.php'         => ['intern','super_admin','mentor','management'],
+        'shared/attendance.php'        => ['intern','super_admin','mentor','management'],
+        'shared/messages.php'          => ['intern','super_admin','mentor','management'],
+        'shared/teams.php'             => ['intern','super_admin','mentor','management'],
+        'shared/certificates.php'      => ['intern','super_admin','management'],
+        'shared/subscriptions.php'     => ['intern','super_admin','management'],
+        'mentor/daily_report.php'      => ['super_admin','mentor','management'],
+        'admin/import_daily_drop.php'  => ['super_admin','mentor','management'],
+        'admin/daily_drop_upload.php'  => ['super_admin','mentor','management'],
+        'admin/task_log.php'           => ['super_admin','management'],
+        'admin/motivation.php'         => ['super_admin','management'],
+        'admin/users.php'              => ['super_admin','management'],
+        'admin/import.php'             => ['super_admin'],
+        'admin/settings.php'           => ['super_admin'],
+        'admin/security.php'           => ['super_admin'],
+        'admin/roles.php'              => ['super_admin'],
+    ];
+}
+
+function has_perm(string $role, string $page_key): bool {
+    if ($role === 'super_admin') return true;
+    global $pdo;
+    static $perm_cache = null;
+    if ($perm_cache === null) {
+        $perm_cache = [];
+        try {
+            foreach ($pdo->query("SELECT role, page_key, allowed FROM role_permissions") as $r) {
+                $perm_cache[$r['role']][$r['page_key']] = (bool)$r['allowed'];
+            }
+        } catch (Exception $_e) {}
+    }
+    if (isset($perm_cache[$role][$page_key])) return $perm_cache[$role][$page_key];
+    return in_array($role, _default_perms()[$page_key] ?? [], true);
+}

@@ -46,15 +46,24 @@ const BADGE_META = [
 $lb = $pdo->query("
     SELECT u.id, u.name, u.email,
            COALESCE(SUM(xl.points),0) AS total_xp,
-           COALESCE(s.current_streak,0) AS streak
+           COALESCE(s.current_streak,0) AS streak,
+           COALESCE(s.longest_streak,0) AS longest_streak,
+           (SELECT COUNT(*) FROM task_progress_log tpl WHERE tpl.user_id=u.id AND tpl.new_status='done') AS tasks_done,
+           (SELECT t.name FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=u.id LIMIT 1) AS team_name
     FROM users u
-    LEFT JOIN xp_log xl  ON xl.user_id = u.id
-    LEFT JOIN streaks s  ON s.user_id  = u.id
+    LEFT JOIN xp_log xl ON xl.user_id = u.id
+    LEFT JOIN streaks s ON s.user_id = u.id
     WHERE u.role = 'intern'
-    GROUP BY u.id, u.name, u.email, s.current_streak
-    ORDER BY total_xp DESC, u.name ASC
+    GROUP BY u.id, u.name, u.email, s.current_streak, s.longest_streak
+    ORDER BY total_xp DESC, tasks_done DESC, u.name ASC
     LIMIT 50
 ")->fetchAll();
+
+// ── My rank in leaderboard ──────────────────────────────────────────
+$my_rank = '—';
+foreach ($lb as $idx => $person) {
+    if ((int)$person['id'] === $uid) { $my_rank = $idx + 1; break; }
+}
 
 // ── My stats ────────────────────────────────────────────────────────
 $my_xp = 0; $my_streak = 0;
@@ -69,13 +78,14 @@ $bq = $pdo->prepare('SELECT badge_key, earned_at FROM badges WHERE user_id=? ORD
 $bq->execute([$uid]); $my_badges = $bq->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // ── Heatmap: last 52 weeks of XP activity ──────────────────────────
+$heat_start = date('Y-m-d', strtotime('-364 days'));
 $hq = $pdo->prepare("
     SELECT DATE(created_at) AS d, COUNT(*) AS cnt
     FROM xp_log
-    WHERE user_id=? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 364 DAY)
+    WHERE user_id=? AND created_at >= ?
     GROUP BY DATE(created_at)
 ");
-$hq->execute([$uid]);
+$hq->execute([$uid, $heat_start]);
 $heat_data = [];
 foreach ($hq->fetchAll() as $row) { $heat_data[$row['d']] = (int)$row['cnt']; }
 
@@ -132,10 +142,17 @@ $rq->execute([$uid]); $recent_xp = $rq->fetchAll();
         </div>
         <span style="font-size:11px;color:var(--muted)"><?= $my_level['to_next'] > 0 ? number_format($my_level['to_next']).' XP to L'.($my_level['level']+1) : 'MAX LEVEL' ?></span>
       </div>
+      <?php if ($role !== 'intern'): ?>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px"><i class="bi bi-info-circle me-1"></i>Viewing as admin — XP not earned for this role</div>
+      <?php endif; ?>
     </div>
     <div class="col-auto text-center">
       <div style="font-size:32px;font-weight:800;color:#f97316"><?= $my_streak ?></div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">🔥 Day Streak</div>
+    </div>
+    <div class="col-auto text-center">
+      <div style="font-size:32px;font-weight:800;color:var(--primary)"><?= $my_rank ?></div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Your Rank</div>
     </div>
     <div class="col-auto">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">Your Badges</div>
@@ -200,10 +217,13 @@ $rq->execute([$uid]); $recent_xp = $rq->fetchAll();
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);<?= $isMe?'background:rgba(212,168,76,.06);margin:0 -20px;padding:10px 20px;border-radius:8px':''; ?>">
         <div class="lb-rank-badge <?= $rankCls ?>"><?= $rank <= 3 ? ['🥇','🥈','🥉'][$rank-1] : $rank ?></div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:8px">
+          <div style="font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <?= e($person['name']) ?>
             <?php if ($isMe): ?><span style="font-size:10px;color:var(--primary);font-weight:800">YOU</span><?php endif; ?>
             <span style="font-size:11px;color:var(--muted)"><?= $plv['icon'] ?> <?= e($plv['title']) ?></span>
+            <?php if ($person['team_name']): ?>
+            <span style="font-size:10px;color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:1px 6px"><?= e($person['team_name']) ?></span>
+            <?php endif; ?>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
             <div class="lb-xp-bar-wrap"><div class="lb-xp-bar-fill" style="width:<?= $barPct ?>%"></div></div>
@@ -211,6 +231,7 @@ $rq->execute([$uid]); $recent_xp = $rq->fetchAll();
             <?php if ($person['streak'] > 0): ?>
             <span style="font-size:11px;color:#f97316">🔥<?= $person['streak'] ?>d</span>
             <?php endif; ?>
+            <span style="font-size:11px;color:var(--muted)"><?= (int)$person['tasks_done'] ?> tasks</span>
           </div>
         </div>
       </div>
@@ -253,6 +274,8 @@ $rq->execute([$uid]); $recent_xp = $rq->fetchAll();
         'attendance'      => ['bi-box-arrow-in-right','#60a5fa','Check-In'],
         'focus_session'   => ['bi-stopwatch-fill','#f97316','Focus Session'],
         'qa_correct'      => ['bi-lightbulb-fill','#a78bfa','Q&A Correct'],
+        'submission'      => ['bi-link-45deg','#34d399','Work Submitted'],
+        'linkedin_post'   => ['bi-linkedin','#0a66c2','LinkedIn Post'],
       ];
       ?>
       <?php if (!$recent_xp): ?>
@@ -285,8 +308,10 @@ $rq->execute([$uid]); $recent_xp = $rq->fetchAll();
       ['bi-box-arrow-in-right','#60a5fa','+10 XP','Daily Check-In'],
       ['bi-stopwatch-fill','#f97316','+10 XP','Focus Session (Pomodoro)'],
       ['bi-lightbulb-fill','#a78bfa','+25 XP','Q&A Correct Answer'],
+      ['bi-link-45deg','#34d399','+10 XP','Work Link Submit'],
+      ['bi-linkedin','#0a66c2','+10 XP','LinkedIn Post'],
     ] as [$icon,$color,$pts,$label]): ?>
-    <div class="col-sm-6 col-md-4 col-lg-2-custom">
+    <div class="col-6 col-md-4 col-xl-2">
       <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(0,0,0,.18);border-radius:12px;border:1px solid var(--border)">
         <i class="bi <?= $icon ?>" style="color:<?= $color ?>;font-size:20px"></i>
         <div>

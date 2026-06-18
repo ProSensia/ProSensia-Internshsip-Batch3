@@ -281,6 +281,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('INSERT INTO task_progress_log(task_id,user_id,old_status,new_status) VALUES(?,?,?,?)')
                 ->execute([$tid, $uid, $old_status, $new]);
         } catch (Exception $e) {}
+        // Award XP when task is marked done (PHP-side, complements wizard AJAX path)
+        if ($new === 'done' && $old_status !== 'done') {
+            try {
+                $pdo->prepare('INSERT INTO xp_log(user_id,points,reason,task_id) VALUES(?,50,\'task_complete\',?)')->execute([$uid, $tid]);
+            } catch (Exception $_xp) {}
+        }
         // Notify if ALL today's tasks done
         if ($new === 'done') {
             $pending = $pdo->prepare("

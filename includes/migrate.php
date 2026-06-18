@@ -10,7 +10,7 @@ function col_exists(PDO $pdo, $table, $col) {
 }
 function run_silent(PDO $pdo, $sql) { try { $pdo->exec($sql); } catch (Exception $e) {} }
 
-$_SCHEMA_TARGET = 6;
+$_SCHEMA_TARGET = 7;
 $_db_ver = 0;
 try {
     $_db_ver = (int)($pdo->query("SELECT v FROM settings WHERE k='schema_ver'")->fetchColumn() ?: 0);
@@ -112,6 +112,15 @@ try {
     // Allow Form C to be re-saved after approval (update-in-place)
     run_silent($pdo,"ALTER TABLE form_c MODIFY status ENUM('draft','submitted','approved','rejected') DEFAULT 'draft'");
 
+    // Phase 7: role-based permissions (configurable access control)
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS role_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        role VARCHAR(30) NOT NULL,
+        page_key VARCHAR(120) NOT NULL,
+        allowed TINYINT(1) NOT NULL DEFAULT 1,
+        UNIQUE KEY role_page (role, page_key)
+    ) ENGINE=InnoDB");
+
     // Stamp version so subsequent loads skip everything above
-    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','6') ON DUPLICATE KEY UPDATE v='6'");
+    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','7') ON DUPLICATE KEY UPDATE v='7'");
 } catch (Exception $e) {}

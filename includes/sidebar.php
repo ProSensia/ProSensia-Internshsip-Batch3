@@ -31,34 +31,33 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if ($role==='intern'): nav_link('intern/index.php','bi-mortarboard','My Internship'); endif; ?>
 
   <div class="nav-section">Workspace</div>
-  <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/enrollment.php','bi-journal-check','Enrollment'); endif; ?>
-  <?php if (in_array($role,['intern','super_admin'],true)): nav_link('intern/profile.php','bi-person-vcard','Profile'); endif; ?>
-  <?php nav_link('intern/leaderboard.php','bi-trophy','Leaderboard'); ?>
-  <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/tasks.php','bi-list-check','Daily Tasks', $_notif_counts['intern/tasks.php'] ?? 0); endif; ?>
-  <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/task_history.php','bi-calendar-week','Task History'); endif; ?>
-  <?php if (in_array($role,['intern','super_admin','mentor','management'],true)): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
+  <?php if (has_perm($role,'intern/enrollment.php')): nav_link('intern/enrollment.php','bi-journal-check','Enrollment'); endif; ?>
+  <?php if (has_perm($role,'intern/profile.php')): nav_link('intern/profile.php','bi-person-vcard','Profile'); endif; ?>
+  <?php if (has_perm($role,'intern/leaderboard.php')): nav_link('intern/leaderboard.php','bi-trophy','Leaderboard'); endif; ?>
+  <?php if (has_perm($role,'intern/tasks.php')): nav_link('intern/tasks.php','bi-list-check','Daily Tasks', $_notif_counts['intern/tasks.php'] ?? 0); endif; ?>
+  <?php if (has_perm($role,'intern/task_history.php')): nav_link('intern/task_history.php','bi-calendar-week','Task History'); endif; ?>
+  <?php if (has_perm($role,'intern/board.php')): nav_link('intern/board.php','bi-kanban','My Board'); endif; ?>
   <?php nav_link('shared/team_board.php','bi-columns-gap','Team Board'); ?>
-  <?php if (in_array($role,['mentor','super_admin','management'],true)): nav_link('mentor/daily_report.php','bi-bar-chart-line','Daily Report'); endif; ?>
-  <?php if (in_array($role,['intern','super_admin','mentor'],true)): nav_link('intern/assignments.php','bi-clipboard-check','Assignments'); endif; ?>
-  <?php nav_link('shared/materials.php','bi-book','Materials'); ?>
-  <?php nav_link('shared/attendance.php','bi-calendar-check','Attendance'); ?>
-  <?php if (in_array($role,['intern','super_admin','management'],true)): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
-  <!-- Motivation & Goals for interns -->
-  <?php if ($role === 'intern'): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>
-  <?php nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); ?>
+  <?php if (has_perm($role,'mentor/daily_report.php')): nav_link('mentor/daily_report.php','bi-bar-chart-line','Daily Report'); endif; ?>
+  <?php if (has_perm($role,'intern/assignments.php')): nav_link('intern/assignments.php','bi-clipboard-check','Assignments'); endif; ?>
+  <?php if (has_perm($role,'shared/materials.php')): nav_link('shared/materials.php','bi-book','Materials'); endif; ?>
+  <?php if (has_perm($role,'shared/attendance.php')): nav_link('shared/attendance.php','bi-calendar-check','Attendance'); endif; ?>
+  <?php if (has_perm($role,'intern/formc.php')): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
+  <?php if (has_perm($role,'intern/motivation.php')): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>
+  <?php if (has_perm($role,'intern/social_post.php')): nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); endif; ?>
 
   <div class="nav-section">Administration</div>
-  <?php if (in_array($role,['super_admin','management','mentor'],true)): nav_link('admin/daily_drop_upload.php','bi-cloud-upload','Daily Drop Upload'); endif; ?>
-  <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
-  <?php if ($role==='super_admin'): nav_link('admin/import_daily_drop.php','bi-cloud-arrow-up','Import Daily Drop'); endif; ?>
-  <?php if ($role==='super_admin'): nav_link('admin/import.php','bi-file-earmark-spreadsheet','Bulk Import'); endif; ?>
-  <?php nav_link('shared/teams.php','bi-diagram-3','Teams'); ?>
-  <?php nav_link('shared/messages.php','bi-chat-dots','Messages'); ?>
-  <?php nav_link('shared/certificates.php','bi-award','Certificates'); ?>
-  <?php nav_link('shared/subscriptions.php','bi-credit-card','Subscriptions'); ?>
-  <!-- Motivation Analysis for admin/management -->
-  <?php if (in_array($role,['super_admin','management'],true)): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
-  <?php if ($role==='super_admin'): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
-  <?php if ($role==='super_admin'): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
-  <?php if ($role==='super_admin'): nav_link('admin/task_log.php','bi-clock-history','Task Version Log', $_notif_counts['admin/task_log.php'] ?? 0); endif; ?>
+  <?php if (has_perm($role,'admin/daily_drop_upload.php')): nav_link('admin/daily_drop_upload.php','bi-cloud-upload','Daily Drop Upload'); endif; ?>
+  <?php if (has_perm($role,'admin/users.php')): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
+  <?php if (has_perm($role,'admin/import_daily_drop.php')): nav_link('admin/import_daily_drop.php','bi-cloud-arrow-up','Import Daily Drop'); endif; ?>
+  <?php if (has_perm($role,'admin/import.php')): nav_link('admin/import.php','bi-file-earmark-spreadsheet','Bulk Import'); endif; ?>
+  <?php if (has_perm($role,'shared/teams.php')): nav_link('shared/teams.php','bi-diagram-3','Teams'); endif; ?>
+  <?php if (has_perm($role,'shared/messages.php')): nav_link('shared/messages.php','bi-chat-dots','Messages'); endif; ?>
+  <?php if (has_perm($role,'shared/certificates.php')): nav_link('shared/certificates.php','bi-award','Certificates'); endif; ?>
+  <?php if (has_perm($role,'shared/subscriptions.php')): nav_link('shared/subscriptions.php','bi-credit-card','Subscriptions'); endif; ?>
+  <?php if (has_perm($role,'admin/motivation.php')): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
+  <?php if (has_perm($role,'admin/settings.php')): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
+  <?php if (has_perm($role,'admin/security.php')): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
+  <?php if (has_perm($role,'admin/task_log.php')): nav_link('admin/task_log.php','bi-clock-history','Task Version Log', $_notif_counts['admin/task_log.php'] ?? 0); endif; ?>
+  <?php if ($role==='super_admin'): nav_link('admin/roles.php','bi-shield-shaded','Roles & Access'); endif; ?>
 </aside>
