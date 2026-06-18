@@ -32,12 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Update all profile fields – including Form C required ones
-    $stmt = $pdo->prepare('UPDATE profiles SET 
+    $stmt = $pdo->prepare('UPDATE profiles SET
         father_name = ?,
         cnic = ?,
         reg_number = ?,
         department = ?,
         semester = ?,
+        internship_year = ?,
         address = ?,
         phone = ?,
         city = ?,
@@ -48,7 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         github = ?,
         linkedin = ?,
         portfolio = ?,
-        bio = ?
+        bio = ?,
+        academic_advisor = ?,
+        academic_advisor_email = ?,
+        academic_advisor_contact = ?
         WHERE user_id = ?');
 
     $stmt->execute([
@@ -57,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['reg_number'] ?? null,
         $_POST['department'] ?? null,
         $_POST['semester'] ?? null,
+        $_POST['internship_year'] ?? null,
         $_POST['address'] ?? null,
         $_POST['phone'] ?? null,
         $_POST['city'] ?? null,
@@ -68,6 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['linkedin'] ?? null,
         $_POST['portfolio'] ?? null,
         $_POST['bio'] ?? null,
+        trim($_POST['academic_advisor'] ?? ''),
+        trim($_POST['academic_advisor_email'] ?? ''),
+        trim($_POST['academic_advisor_contact'] ?? ''),
         $uid
     ]);
 
@@ -114,9 +122,15 @@ $pr = $p->fetch() ?: [];
         <div class="col-md-6"><label class="form-label">CNIC # <span class="text-danger">*</span></label><input class="form-control" name="cnic" value="<?= e($pr['cnic'] ?? '') ?>" required></div>
         <div class="col-md-6"><label class="form-label">Registration number <span class="text-danger">*</span></label><input class="form-control" name="reg_number" value="<?= e($pr['reg_number'] ?? '') ?>" required></div>
         <div class="col-md-6"><label class="form-label">Department <span class="text-danger">*</span></label><input class="form-control" name="department" value="<?= e($pr['department'] ?? 'Electrical and Computer Engineering') ?>" required></div>
-        <div class="col-md-6"><label class="form-label">Semester <span class="text-danger">*</span></label><input class="form-control" name="semester" value="<?= e($pr['semester'] ?? '') ?>" required></div>
+        <div class="col-md-6"><label class="form-label">Semester</label><input class="form-control" name="semester" value="<?= e($pr['semester'] ?? '') ?>" placeholder="e.g. 5th Semester"></div>
+        <div class="col-md-6"><label class="form-label">Internship Year <span class="text-danger">*</span></label><input class="form-control" name="internship_year" value="<?= e($pr['internship_year'] ?? $pr['semester'] ?? '') ?>" placeholder="e.g. 3rd Year / 2025" required></div>
         <div class="col-12"><label class="form-label">Present address <span class="text-danger">*</span></label><textarea class="form-control" name="address" rows="2" required><?= e($pr['address'] ?? '') ?></textarea></div>
-        
+
+        <!-- Form C: Academic Advisor -->
+        <div class="col-md-5"><label class="form-label">Academic Advisor Name <span class="text-danger">*</span></label><input class="form-control" name="academic_advisor" value="<?= e($pr['academic_advisor'] ?? '') ?>" placeholder="Dr. / Prof. full name"></div>
+        <div class="col-md-4"><label class="form-label">Advisor Email</label><input class="form-control" type="email" name="academic_advisor_email" value="<?= e($pr['academic_advisor_email'] ?? '') ?>" placeholder="advisor@paf-iast.edu.pk"></div>
+        <div class="col-md-3"><label class="form-label">Advisor Contact #</label><input class="form-control" name="academic_advisor_contact" value="<?= e($pr['academic_advisor_contact'] ?? '') ?>" placeholder="+92-…"></div>
+
         <!-- Additional academic & professional -->
         <div class="col-md-6"><label class="form-label">City</label><input class="form-control" name="city" value="<?= e($pr['city'] ?? '') ?>"></div>
         <div class="col-md-6"><label class="form-label">Graduation year</label><input class="form-control" name="graduation_year" value="<?= e($pr['graduation_year'] ?? '') ?>"></div>

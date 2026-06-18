@@ -10,7 +10,7 @@ function col_exists(PDO $pdo, $table, $col) {
 }
 function run_silent(PDO $pdo, $sql) { try { $pdo->exec($sql); } catch (Exception $e) {} }
 
-$_SCHEMA_TARGET = 5;
+$_SCHEMA_TARGET = 6;
 $_db_ver = 0;
 try {
     $_db_ver = (int)($pdo->query("SELECT v FROM settings WHERE k='schema_ver'")->fetchColumn() ?: 0);
@@ -104,6 +104,14 @@ try {
         UNIQUE KEY one_per_task_day (task_id, user_id, submitted_date)
     ) ENGINE=InnoDB");
 
+    // Phase 6: Form C – academic advisor fields on profiles + internship_year
+    if (!col_exists($pdo,'profiles','academic_advisor'))         run_silent($pdo,"ALTER TABLE profiles ADD COLUMN academic_advisor VARCHAR(160) NULL");
+    if (!col_exists($pdo,'profiles','academic_advisor_email'))   run_silent($pdo,"ALTER TABLE profiles ADD COLUMN academic_advisor_email VARCHAR(160) NULL");
+    if (!col_exists($pdo,'profiles','academic_advisor_contact')) run_silent($pdo,"ALTER TABLE profiles ADD COLUMN academic_advisor_contact VARCHAR(80) NULL");
+    if (!col_exists($pdo,'profiles','internship_year'))          run_silent($pdo,"ALTER TABLE profiles ADD COLUMN internship_year VARCHAR(40) NULL");
+    // Allow Form C to be re-saved after approval (update-in-place)
+    run_silent($pdo,"ALTER TABLE form_c MODIFY status ENUM('draft','submitted','approved','rejected') DEFAULT 'draft'");
+
     // Stamp version so subsequent loads skip everything above
-    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','5') ON DUPLICATE KEY UPDATE v='5'");
+    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','6') ON DUPLICATE KEY UPDATE v='6'");
 } catch (Exception $e) {}
