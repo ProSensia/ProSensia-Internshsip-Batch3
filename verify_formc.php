@@ -10,13 +10,13 @@ require_once __DIR__ . '/includes/connection.php'; // this should create $pdo
 // For example, some use $conn or $db. Check your connection.php content.
 
 $ref = $_GET['ref'] ?? '';
-if (empty($ref) || !preg_match('/^ProSensiaB(\d{4})$/', $ref, $matches)) {
+if (empty($ref) || !preg_match('/^PAF-PS-(\d{5})$/', $ref, $matches)) {
     http_response_code(400);
     die('Invalid reference number.');
 }
 
 $refNum = (int)$matches[1];
-$formId = $refNum - 3000; // ProSensiaB3001 = id 1
+$formId = $refNum - 4000; // PAF-PS-04001 = id 1
 
 try {
     $stmt = $pdo->prepare('
