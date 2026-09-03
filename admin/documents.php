@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/security.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $me = current_user();
-    if (($me['role'] ?? '') !== 'super_admin') { http_response_code(403); exit('Forbidden'); }
+    if (!is_admin_role($me['role'] ?? '')) { http_response_code(403); exit('Forbidden'); }
     if (($_POST['action'] ?? '') === 'revoke') {
         $docId = (int)($_POST['doc_id'] ?? 0);
         $reason = trim($_POST['reason'] ?? '');
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $page_title = 'Document Registry'; $page_section = 'Administration'; $page_label = 'Document Registry';
 require __DIR__ . '/../includes/header.php';
 require_role(['super_admin', 'management']);
-$is_admin = $user['role'] === 'super_admin';
+$is_admin = is_admin_role($user['role']);
 
 $docs = $pdo->query("
     SELECT d.*, u.name AS student_name

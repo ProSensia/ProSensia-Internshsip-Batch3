@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $u = current_user(); if (($u['role'] ?? '') !== 'super_admin') { http_response_code(403); exit('Forbidden'); }
+    $u = current_user(); if (!is_admin_role($u['role'] ?? '')) { http_response_code(403); exit('Forbidden'); }
 
     $configurable = ['mentor', 'management']; // intern and super_admin not configurable
     $pages = array_keys(_default_perms());
@@ -76,6 +76,7 @@ $sections = [
         'admin/settings.php'=> 'Settings',
         'admin/security.php'=> 'Security',
         'admin/form_e_eligibility.php' => 'Form E Eligibility',
+        'admin/form_e_review.php'      => 'Form E Review',
         'admin/documents.php'          => 'Document Registry',
     ],
 ];

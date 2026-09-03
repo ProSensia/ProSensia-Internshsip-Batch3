@@ -7,7 +7,9 @@
 require_once __DIR__ . '/../includes/security.php';
 require_login();
 $me = current_user();
-if (!in_array($me['role'] ?? '', ['super_admin', 'management'], true)) { http_response_code(403); exit('Forbidden.'); }
+if (!in_array($me['role'] ?? '', ['super_admin', 'management', 'founder'], true)) { http_response_code(403); exit('Forbidden.'); }
+
+$founderRow = $pdo->query("SELECT name FROM users WHERE role='founder' LIMIT 1")->fetch();
 
 require_once __DIR__ . '/../shared/form_e_template.php';
 render_form_e_document([
@@ -33,7 +35,9 @@ render_form_e_document([
     'comments'  => 'Sample comments: excellent performance throughout the internship, consistently delivered high-quality work and collaborated well with the team.',
     'academic_supervisor_name' => 'Dr. Sample Advisor',
     'evaluated_at' => date('Y-m-d H:i:s'),
+    'founder_approved_by_name' => $founderRow['name'] ?? 'Momin Khan',
+    'founder_approved_at'      => date('Y-m-d H:i:s'),
     'doc_uid'    => 'FE-SAMPLE-PREVIEW',
-    'issued_at'  => null,
-    'verify_url' => '',
+    'issued_at'  => date('Y-m-d H:i:s'),
+    'verify_url' => base_url('verify_document.php') . '?d=SAMPLE&t=SAMPLE',
 ], 'preview');

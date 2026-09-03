@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/auth.php';
 require_login();
 $user = current_user();
 $role = $user['role'];
-$is_admin = $role === 'super_admin';
+$is_admin = is_admin_role($role);
 
 $easypaisa_no   = setting('easypaisa_number','03107717890');
 $easypaisa_name = setting('easypaisa_name', founder_name());

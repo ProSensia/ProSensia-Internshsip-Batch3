@@ -5,7 +5,7 @@ require_login();
 $role = $user['role'];
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
-    if (($_POST['action'] ?? '')==='create' && in_array($role,['super_admin','management','mentor'],true)) {
+    if (($_POST['action'] ?? '')==='create' && in_array($role,['super_admin','management','mentor','founder'],true)) {
         $pdo->beginTransaction();
         $pdo->prepare('INSERT INTO teams(name,description,created_by) VALUES(?,?,?)')
             ->execute([$_POST['name'],$_POST['description'],$user['id']]);
@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         flash('Team created.');
         header('Location: '.base_url('shared/teams.php')); exit;
     }
-    if (($_POST['action'] ?? '')==='delete' && $role==='super_admin') {
+    if (($_POST['action'] ?? '')==='delete' && is_admin_role($role)) {
         $pdo->prepare('DELETE FROM teams WHERE id=?')->execute([(int)$_POST['id']]);
         header('Location: '.base_url('shared/teams.php')); exit;
     }
@@ -30,7 +30,7 @@ $users = $pdo->query('SELECT id,name,role FROM users ORDER BY name')->fetchAll()
 <div class="d-flex justify-content-between align-items-end mb-4">
   <div><h1 class="serif" style="font-size:38px;margin:0">Teams</h1>
   <p class="muted mb-0">Group interns by capstone, batch, or project — each team gets its own chat channel.</p></div>
-  <?php if (in_array($role,['super_admin','management','mentor'],true)): ?>
+  <?php if (in_array($role,['super_admin','management','mentor','founder'],true)): ?>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newTeam"><i class="bi bi-plus-lg me-1"></i>New team</button>
   <?php endif; ?>
 </div>
@@ -47,7 +47,7 @@ $users = $pdo->query('SELECT id,name,role FROM users ORDER BY name')->fetchAll()
         </div>
         <a class="btn btn-outline-light btn-sm" href="<?= base_url('shared/messages.php?ch=team:'.(int)$t['id']) ?>"><i class="bi bi-chat-dots me-1"></i>Open chat</a>
       </div>
-      <?php if ($role==='super_admin'): ?>
+      <?php if (is_admin_role($role)): ?>
       <form method="post" class="mt-2"><input type="hidden" name="id" value="<?= (int)$t['id'] ?>">
         <button class="btn btn-danger btn-sm" name="action" value="delete" onclick="return confirm('Delete this team and its messages?')"><i class="bi bi-trash"></i> Delete</button>
       </form>

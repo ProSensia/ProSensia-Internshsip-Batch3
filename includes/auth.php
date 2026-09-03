@@ -15,6 +15,10 @@ function require_login() {
 function require_role(array $allowed) {
     require_login();
     $u = current_user();
+    // Founder & CEO has full authority above every other role — bypasses
+    // every require_role() check site-wide, so nothing has to individually
+    // list 'founder' in its allowed-roles array.
+    if ($u['role'] === 'founder') return;
     if (!in_array($u['role'], $allowed, true)) {
         http_response_code(403);
         echo '<div style="font-family:system-ui;padding:40px;color:#fca5a5;background:#1a0a0a;">403 — Forbidden. Your role ('.$u['role'].') cannot access this page.</div>';
@@ -35,6 +39,7 @@ function base_url($path = '') {
 
 function role_home($role) {
     return [
+      'founder'     => base_url('admin/index.php'),
       'super_admin' => base_url('admin/index.php'),
       'management'  => base_url('management/index.php'),
       'mentor'      => base_url('mentor/index.php'),
@@ -43,7 +48,22 @@ function role_home($role) {
 }
 
 function role_label($role) {
-    return ['super_admin'=>'Super Admin','management'=>'Management','mentor'=>'Mentor','intern'=>'Intern'][$role] ?? $role;
+    return ['founder'=>'Founder & CEO','super_admin'=>'Super Admin','management'=>'Management','mentor'=>'Mentor','intern'=>'Intern'][$role] ?? $role;
+}
+
+/** True for super_admin OR founder — use this instead of a literal
+ *  === 'super_admin' check anywhere that check meant "the top authority",
+ *  so Founder & CEO (which sits above super_admin) isn't accidentally
+ *  excluded from admin-level actions across the app. */
+function is_admin_role(?string $role): bool {
+    return in_array($role, ['super_admin', 'founder'], true);
+}
+
+/** True if the singleton Founder & CEO role has already been claimed by anyone. */
+function founder_role_claimed(): bool {
+    global $pdo;
+    try { return (bool)(int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='founder'")->fetchColumn(); }
+    catch (Exception $e) { return false; }
 }
 
 function flash($msg = null) {
@@ -156,6 +176,7 @@ function _default_perms(): array {
         'mentor/form_e_evaluate.php'   => ['mentor','super_admin'],
         'admin/form_e_eligibility.php' => ['super_admin','management'],
         'admin/form_e_preview_sample.php' => ['super_admin','management'],
+        'admin/form_e_review.php'      => ['super_admin','management'],
         'admin/documents.php'          => ['super_admin','management'],
         'shared/materials.php'         => ['intern','super_admin','mentor','management'],
         'shared/attendance.php'        => ['intern','super_admin','mentor','management'],
@@ -177,7 +198,7 @@ function _default_perms(): array {
 }
 
 function has_perm(string $role, string $page_key): bool {
-    if ($role === 'super_admin') return true;
+    if (in_array($role, ['super_admin', 'founder'], true)) return true;
     global $pdo;
     static $perm_cache = null;
     if ($perm_cache === null) {

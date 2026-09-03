@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         }
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
-    if (($_POST['action'] ?? '')==='issue' && $role==='super_admin') {
+    if (($_POST['action'] ?? '')==='issue' && is_admin_role($role)) {
         $id = (int)$_POST['id'];
         $serial = 'PSN-B3-'.str_pad((string)random_int(1000,9999),4,'0',STR_PAD_LEFT);
         $pdo->prepare("UPDATE certificate_requests SET status='issued',serial=?,final_grade=?,mentor_rating=?,reviewer_note=?,issued_at=NOW(),issued_by=? WHERE id=?")
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         flash('Certificate issued ('.$serial.').');
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
-    if (($_POST['action'] ?? '')==='reject' && $role==='super_admin') {
+    if (($_POST['action'] ?? '')==='reject' && is_admin_role($role)) {
         $id = (int)$_POST['id'];
         $rtQ = $pdo->prepare('SELECT request_type FROM certificate_requests WHERE id=?'); $rtQ->execute([$id]);
         $rt = $rtQ->fetchColumn() ?: 'certificate';
@@ -161,9 +161,9 @@ if ($issued): foreach($issued as $c):
 <?php endforeach; endif; ?>
 
 <div class="glass card-pad">
-  <h4 class="serif mb-3"><?= $role==='super_admin' ? 'Approval queue' : 'My requests' ?></h4>
+  <h4 class="serif mb-3"><?= is_admin_role($role) ? 'Approval queue' : 'My requests' ?></h4>
   <?php if (!$items): ?><p class="muted">No certificate requests yet.</p><?php endif; ?>
-  <?php foreach($items as $c): if ($role!=='super_admin' && $c['status']==='issued') continue; ?>
+  <?php foreach($items as $c): if (!is_admin_role($role) && $c['status']==='issued') continue; ?>
     <div class="py-3" style="border-top:1px solid var(--border)">
       <div class="d-flex justify-content-between">
         <div>
@@ -178,7 +178,7 @@ if ($issued): foreach($issued as $c):
         <?php $waitHrs = $c['status']==='pending' ? (time() - strtotime($c['requested_at'])) / 3600 : 0; ?>
         <span class="badge <?= $c['status']==='issued'?'b-success':($c['status']==='rejected'?'b-danger':($waitHrs>48?'b-danger':($waitHrs>24?'b-warning':'b-muted'))) ?>"><?= e(ucfirst($c['status'])) ?></span>
       </div>
-      <?php if ($role==='super_admin' && $c['status']==='pending'): ?>
+      <?php if (is_admin_role($role) && $c['status']==='pending'): ?>
       <div class="row g-2 mt-2">
         <form method="post" class="row g-2 align-items-end col-12">
           <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">

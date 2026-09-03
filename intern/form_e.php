@@ -12,7 +12,7 @@ $role = $me['role'];
 
 // ── Raw document view (no portal chrome) — Preview → Print → Download PDF ──
 if (($_GET['view'] ?? '') === 'doc') {
-    $target = ($role === 'super_admin' && !empty($_GET['uid'])) ? (int)$_GET['uid'] : (int)$me['id'];
+    $target = (is_admin_role($role) && !empty($_GET['uid'])) ? (int)$_GET['uid'] : (int)$me['id'];
     $q = $pdo->prepare('SELECT fe.*, u.name AS student_name, p.reg_number
                          FROM form_e fe JOIN users u ON u.id = fe.user_id
                          LEFT JOIN profiles p ON p.user_id = fe.user_id
@@ -34,6 +34,11 @@ if (($_GET['view'] ?? '') === 'doc') {
         $eq = $pdo->prepare('SELECT name FROM users WHERE id=?'); $eq->execute([$fe['evaluator_id']]);
         $evalName = (string)($eq->fetchColumn() ?: '');
     }
+    $founderName = '';
+    if ($fe['founder_approved_by']) {
+        $fnq = $pdo->prepare('SELECT name FROM users WHERE id=?'); $fnq->execute([$fe['founder_approved_by']]);
+        $founderName = (string)($fnq->fetchColumn() ?: '');
+    }
 
     require_once __DIR__ . '/../shared/form_e_template.php';
     render_form_e_document([
@@ -47,6 +52,7 @@ if (($_GET['view'] ?? '') === 'doc') {
         'report_submitted' => $fe['report_submitted'], 'certificate_attached' => $fe['certificate_attached'],
         'comments' => $fe['supervisor_comments'], 'academic_supervisor_name' => $fe['academic_supervisor_name'],
         'evaluator_name' => $evalName, 'evaluated_at' => $fe['evaluated_at'],
+        'founder_approved_by_name' => $founderName, 'founder_approved_at' => $fe['founder_approved_at'],
         'doc_uid' => $doc['doc_uid'] ?? '', 'issued_at' => $doc['issued_at'] ?? null,
         'verify_url' => $doc ? doc_verify_url($doc['doc_uid'], $doc['token']) : '',
     ], 'final');
@@ -71,10 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reque
 // ── Chrome page ──────────────────────────────────────────────────────────────
 $page_title = 'Form E'; $page_section = 'Workspace'; $page_label = 'Form E';
 require __DIR__ . '/../includes/header.php';
-require_role(['intern', 'super_admin']);
+require_role(['intern', 'super_admin', 'founder']);
 
 $uid = (int)$user['id'];
-$target = ($user['role'] === 'super_admin' && !empty($_GET['uid'])) ? (int)$_GET['uid'] : $uid;
+$target = (is_admin_role($user['role']) && !empty($_GET['uid'])) ? (int)$_GET['uid'] : $uid;
 
 $rq = $pdo->prepare('SELECT * FROM form_e_requests WHERE user_id=? ORDER BY id DESC LIMIT 1');
 $rq->execute([$target]); $request = $rq->fetch();
@@ -83,9 +89,47 @@ $fq = $pdo->prepare('SELECT * FROM form_e WHERE user_id=?');
 $fq->execute([$target]); $fe = $fq->fetch();
 
 $evaluators = form_e_evaluators_for($target);
+
+// ── Tracker: where the application currently is, 1 of 6 stages ─────────────
+$stages = ['Requested', 'Eligibility Approved', 'Team Lead Evaluation', 'Super Admin Review', 'Founder Approval', 'Issued'];
+$currentStage = 0; // -1 = rejected (terminal)
+if ($request) {
+    if ($request['status'] === 'rejected') { $currentStage = -1; }
+    elseif ($request['status'] === 'pending') { $currentStage = 0; }
+    elseif ($request['status'] === 'approved') {
+        $currentStage = 1;
+        if ($fe) {
+            $currentStage = match ($fe['status']) {
+                'pending_evaluation' => 1,
+                'evaluated', 'pending_admin_review' => 2,
+                'pending_founder_approval' => 3,
+                'finalized' => 5,
+                default => 1,
+            };
+        }
+    }
+}
+if ($currentStage >= 0) {
 ?>
+<div class="glass card-pad mb-3">
+  <div class="d-flex justify-content-between" style="overflow-x:auto;gap:4px">
+    <?php foreach ($stages as $i => $label): $done = $i < $currentStage; $active = $i === $currentStage; ?>
+    <div class="text-center" style="flex:1;min-width:90px">
+      <div style="width:30px;height:30px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-size:13px;font-weight:700;
+        background:<?= $done ? 'var(--success)' : ($active ? 'linear-gradient(135deg,var(--primary),var(--primary-glow))' : 'rgba(255,255,255,.06)') ?>;
+        color:<?= $done || $active ? '#0b0d12' : 'var(--muted)' ?>;border:1px solid <?= $done ? 'var(--success)' : ($active ? 'var(--primary)' : 'var(--border)') ?>">
+        <?= $done ? '<i class="bi bi-check-lg"></i>' : ($i + 1) ?>
+      </div>
+      <div style="font-size:10.5px;color:<?= $active ? 'var(--primary-glow)' : 'var(--muted)' ?>;font-weight:<?= $active ? '700' : '400' ?>"><?= e($label) ?></div>
+    </div>
+    <?php if ($i < count($stages) - 1): ?><div style="flex:0 0 auto;width:20px;height:1px;background:<?= $done ? 'var(--success)' : 'var(--border)' ?>;margin-top:15px"></div><?php endif; ?>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php } ?>
+
 <h1 class="serif mb-1" style="font-size:34px">Form E — Internee&rsquo;s Evaluation Form</h1>
-<p class="muted mb-3">The official Pak-Austria Fachhochschule (PAF-IAST) evaluation form. Access requires Super Admin approval; the evaluation itself is completed by your assigned Team Lead / Industry Supervisor.</p>
+<p class="muted mb-3">The official Pak-Austria Fachhochschule (PAF-IAST) evaluation form. Access requires Super Admin approval; the evaluation itself is completed by your assigned Team Lead / Industry Supervisor, then reviewed by Super Admin and finally approved by the Founder &amp; CEO.</p>
 
 <div class="glass card-pad">
 <?php if (!$request): ?>
@@ -118,6 +162,10 @@ $evaluators = form_e_evaluators_for($target);
         <i class="bi bi-file-earmark-pdf me-1"></i>Open Form E
       </a>
     </div>
+  <?php elseif ($fe['status'] === 'pending_admin_review'): ?>
+    <div class="alert alert-info mb-0"><i class="bi bi-clipboard2-data me-2"></i><strong>Under Super Admin review.</strong> Your Team Lead has completed their evaluation — it's now being reviewed before final approval.</div>
+  <?php elseif ($fe['status'] === 'pending_founder_approval'): ?>
+    <div class="alert alert-info mb-0"><i class="bi bi-award me-2"></i><strong>Awaiting final approval.</strong> Your evaluation has been endorsed and is with the Founder &amp; CEO for the final sign-off.</div>
   <?php else: ?>
     <div class="alert alert-info mb-2"><i class="bi bi-person-check me-2"></i><strong>Approved.</strong> Your evaluation is being prepared by your Team Lead / Industry Supervisor.</div>
     <?php if ($evaluators): ?>

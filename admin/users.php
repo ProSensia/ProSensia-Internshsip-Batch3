@@ -1,11 +1,25 @@
 <?php
 $page_title='Users & Approvals'; $page_section='Administration'; $page_label='Users';
 require __DIR__ . '/../includes/header.php';
-require_role(['super_admin','management']);
-$is_admin = $user['role']==='super_admin';
+require_role(['super_admin','management','founder']);
+$is_admin = is_admin_role($user['role']);
+
+// The Founder & CEO account is permanently protected here: its role can
+// never be changed, and it can never be deactivated/deleted, regardless of
+// who is performing the action (see admin/founder_claim.php for the only
+// way that role is ever granted, once, to begin with).
+$targetIsFounder = false;
+if ($_SERVER['REQUEST_METHOD']==='POST' && $is_admin && (int)($_POST['id']??0)) {
+    $tr = $pdo->prepare('SELECT role FROM users WHERE id=?'); $tr->execute([(int)$_POST['id']]);
+    $targetIsFounder = $tr->fetchColumn() === 'founder';
+}
 
 if ($_SERVER['REQUEST_METHOD']==='POST' && $is_admin) {
   $a=$_POST['action']??''; $id=(int)($_POST['id']??0);
+  if ($targetIsFounder && in_array($a, ['deactivate','delete','role'], true)) {
+      flash('The Founder & CEO account cannot be deactivated, deleted, or have its role changed.');
+      header('Location: '.base_url('admin/users.php')); exit;
+  }
   if ($a==='approve')    { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['active',$id]); flash('User approved.'); }
   if ($a==='reject')     { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['rejected',$id]); flash('User rejected.'); }
   if ($a==='deactivate') { $pdo->prepare('UPDATE users SET status=? WHERE id=?')->execute(['inactive',$id]); flash('User deactivated.'); }
@@ -69,7 +83,7 @@ $all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.s
         <td><b><?= e($u['name']) ?></b><?php if(!empty($u['reg_number'])): ?><div class="muted" style="font-size:11px"><?= e($u['reg_number']) ?></div><?php endif; ?></td>
         <td class="muted"><?= e($u['email']) ?></td>
         <td>
-          <?php if($is_admin): ?>
+          <?php if($is_admin && $u['role'] !== 'founder'): ?>
           <form method="post" class="d-flex gap-1"><input type="hidden" name="action" value="role"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
             <select name="role" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
               <?php foreach(['intern','mentor','management','super_admin'] as $r): ?>
@@ -77,12 +91,13 @@ $all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.s
               <?php endforeach; ?>
             </select>
           </form>
-          <?php else: ?><?= role_label($u['role']) ?><?php endif; ?>
+          <?php else: ?><span class="<?= $u['role']==='founder' ? 'badge b-primary' : '' ?>"><?= role_label($u['role']) ?></span><?php if($u['role']==='founder'): ?> <i class="bi bi-lock-fill" title="Permanent — cannot be changed" style="font-size:11px;opacity:.6"></i><?php endif; endif; ?>
         </td>
         <td><span class="badge <?= $u['status']==='active'?'b-success':($u['status']==='rejected'?'b-danger':'b-muted') ?>"><?= e(ucfirst($u['status'])) ?></span></td>
         <?php if($is_admin): ?>
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#editU<?= (int)$u['id'] ?>" title="Edit"><i class="bi bi-pencil"></i></button>
+          <?php if($u['role'] !== 'founder'): ?>
           <?php if($u['status']==='active'): ?>
             <form method="post"><input type="hidden" name="action" value="deactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-ghost btn-sm" title="Deactivate"><i class="bi bi-pause-circle"></i></button></form>
           <?php else: ?>
@@ -90,6 +105,7 @@ $all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.s
           <?php endif; ?>
           <?php if ((int)$u['id'] !== (int)$user['id']): ?>
           <form method="post" onsubmit="return confirm('Permanently delete <?= e($u['name']) ?>? This removes their profile, tasks and history.')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button></form>
+          <?php endif; ?>
           <?php endif; ?>
         </td>
         <?php endif; ?>

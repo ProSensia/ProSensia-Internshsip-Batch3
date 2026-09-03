@@ -10,7 +10,7 @@ function col_exists(PDO $pdo, $table, $col) {
 }
 function run_silent(PDO $pdo, $sql) { try { $pdo->exec($sql); } catch (Exception $e) {} }
 
-$_SCHEMA_TARGET = 8;
+$_SCHEMA_TARGET = 9;
 $_db_ver = 0;
 try {
     $_db_ver = (int)($pdo->query("SELECT v FROM settings WHERE k='schema_ver'")->fetchColumn() ?: 0);
@@ -223,6 +223,23 @@ try {
         ('form_e_supervisor_name','Momin Khan'),
         ('form_e_supervisor_title','Founder / Director / CEO')");
 
+    // Phase 9: singleton "Founder & CEO" role (full authority, above
+    // super_admin) + the 4-stage Form E approval chain (Team Lead evaluation
+    // -> Super Admin review -> Founder final approval), with a full remark
+    // timeline reusing the audit_log table already added in Phase 8.
+    //
+    // Widening the role/status ENUMs keeps every prior value too (never
+    // removes one a live row could already hold) so this ALTER can never
+    // fail or silently truncate existing data, regardless of what's
+    // currently in the production table.
+    run_silent($pdo,"ALTER TABLE users MODIFY COLUMN role ENUM('super_admin','management','mentor','intern','founder') NOT NULL");
+    run_silent($pdo,"ALTER TABLE form_e MODIFY COLUMN status ENUM('pending_evaluation','evaluated','pending_admin_review','pending_founder_approval','finalized') DEFAULT 'pending_evaluation'");
+
+    if (!col_exists($pdo,'form_e','admin_reviewed_by'))  run_silent($pdo,"ALTER TABLE form_e ADD COLUMN admin_reviewed_by INT NULL AFTER evaluated_at");
+    if (!col_exists($pdo,'form_e','admin_reviewed_at'))  run_silent($pdo,"ALTER TABLE form_e ADD COLUMN admin_reviewed_at TIMESTAMP NULL AFTER admin_reviewed_by");
+    if (!col_exists($pdo,'form_e','founder_approved_by')) run_silent($pdo,"ALTER TABLE form_e ADD COLUMN founder_approved_by INT NULL AFTER admin_reviewed_at");
+    if (!col_exists($pdo,'form_e','founder_approved_at')) run_silent($pdo,"ALTER TABLE form_e ADD COLUMN founder_approved_at TIMESTAMP NULL AFTER founder_approved_by");
+
     // Stamp version so subsequent loads skip everything above
-    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','8') ON DUPLICATE KEY UPDATE v='8'");
+    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','9') ON DUPLICATE KEY UPDATE v='9'");
 } catch (Exception $e) {}

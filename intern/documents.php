@@ -40,7 +40,7 @@ $cert = $pdo->prepare("SELECT status FROM certificate_requests WHERE user_id=? A
 $exp = $pdo->prepare("SELECT status FROM certificate_requests WHERE user_id=? AND request_type='experience_letter' ORDER BY id DESC LIMIT 1"); $exp->execute([$target]); $expStatus = $exp->fetchColumn() ?: null;
 
 function doc_badge($label) {
-    $map = ['approved'=>'b-success','issued'=>'b-success','finalized'=>'b-success','submitted'=>'b-warning','pending'=>'b-warning','pending_evaluation'=>'b-warning','rejected'=>'b-danger'];
+    $map = ['approved'=>'b-success','issued'=>'b-success','finalized'=>'b-success','submitted'=>'b-warning','pending'=>'b-warning','pending_evaluation'=>'b-warning','pending_admin_review'=>'b-info','pending_founder_approval'=>'b-info','rejected'=>'b-danger'];
     $cls = $map[$label] ?? 'b-muted';
     return '<span class="badge ' . $cls . '">' . e($label ? ucfirst(str_replace('_',' ',$label)) : 'Not requested') . '</span>';
 }

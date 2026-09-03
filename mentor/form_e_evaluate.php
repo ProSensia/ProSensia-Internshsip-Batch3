@@ -1,17 +1,21 @@
 <?php
-// mentor/form_e_evaluate.php — Team Lead (mentor) / Super Admin evaluation of
-// an eligibility-approved student's Form E: assigned-task ratings + the
-// reference form's other 6 evaluation items, save-as-draft or finalize
-// (which issues the document + QR via includes/security.php).
+// mentor/form_e_evaluate.php — Team Lead (mentor) evaluation stage (1 of 4)
+// of Form E: assigned-task ratings + the reference form's other 6 evaluation
+// items, save-as-draft or submit for review. This no longer issues the final
+// document directly — "Submit for Review" only hands off to the Super Admin
+// review stage (admin/form_e_review.php); final approval + issuance now
+// belongs solely to the Founder & CEO (admin/form_e_founder_approval.php).
+// Once submitted, the record disappears from this list (locked) until it is
+// either sent back here for fixes or fully approved.
 require_once __DIR__ . '/../includes/security.php';
 require_login();
 
 $me   = current_user();
 $role = $me['role'];
-if (!in_array($role, ['mentor', 'super_admin'], true)) { http_response_code(403); exit('Forbidden.'); }
+if (!in_array($role, ['mentor', 'super_admin', 'founder'], true)) { http_response_code(403); exit('Forbidden.'); }
 
 function fe_can_access(int $meId, string $role, int $studentId): bool {
-    if ($role === 'super_admin') return true;
+    if (is_admin_role($role)) return true;
     return can_evaluate_form_e($meId, $studentId);
 }
 
@@ -85,7 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $taskText = $_POST['task_text'] ?? [];
     $taskRating = $_POST['task_rating'] ?? [];
 
-    if ($action === 'save_draft' || $action === 'finalize') {
+    // Editing is only allowed while the record is actually at this stage —
+    // once forwarded, it's locked here even if someone replays an old form.
+    if (in_array($action, ['save_draft', 'submit_review'], true) && $fe['status'] !== 'pending_evaluation') {
+        flash('This Form E has already been forwarded and is locked at this stage.');
+        header('Location: ' . base_url('mentor/form_e_evaluate.php')); exit;
+    }
+
+    if ($action === 'save_draft' || $action === 'submit_review') {
         // Normalize enum values — blank string becomes NULL, never an invalid enum value.
         foreach ($fields as $k => $v) { $fields[$k] = ($v === '' ? null : $v); }
 
@@ -102,20 +113,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_audit((int)$me['id'], 'form_e.evaluate_draft', 'form_e', (int)$fe['id']);
             flash('Draft saved.');
         } else {
-            // Finalize: require every evaluation field + all 3 task ratings filled.
+            // Submit for review: require every evaluation field + all 3 task ratings filled.
             $tCheck = $pdo->prepare('SELECT COUNT(*) FROM form_e_tasks WHERE form_e_id=? AND (task_text="" OR rating IS NULL)');
             $tCheck->execute([$fe['id']]);
             $missingTasks = (int)$tCheck->fetchColumn() > 0;
             $missingFields = in_array(null, $fields, true) || $comments === '';
 
             if ($missingTasks || $missingFields) {
-                flash('Please complete every evaluation field and rate all 3 tasks before finalizing.');
+                flash('Please complete every evaluation field and rate all 3 tasks before submitting for review.');
             } else {
-                $pdo->prepare('UPDATE form_e SET status="finalized", evaluator_id=?, evaluated_at=NOW() WHERE id=?')
+                $pdo->prepare('UPDATE form_e SET status="pending_admin_review", evaluator_id=?, evaluated_at=NOW() WHERE id=?')
                     ->execute([(int)$me['id'], $fe['id']]);
-                $issued = issue_document('form_e', 'form_e', (int)$fe['id'], $studentId, (int)$me['id']);
-                log_audit((int)$me['id'], 'form_e.finalize', 'form_e', (int)$fe['id'], ['doc_uid' => $issued['doc_uid'] ?? null]);
-                flash('Form E finalized and issued. The student can now view/print it.');
+                log_audit((int)$me['id'], 'form_e.submit_review', 'form_e', (int)$fe['id']);
+                flash('Evaluation submitted for Super Admin review. This record is now locked here until it comes back or is approved.');
             }
         }
     }
@@ -125,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Chrome page ──────────────────────────────────────────────────────────────
 $page_title = 'Evaluate Form E'; $page_section = 'Administration'; $page_label = 'Evaluate Form E';
 require __DIR__ . '/../includes/header.php';
-require_role(['mentor', 'super_admin']);
+require_role(['mentor', 'super_admin', 'founder']);
 
 $studentId = (int)($_GET['student'] ?? 0);
 
@@ -137,8 +147,32 @@ if ($studentId) {
     $sq->execute([$studentId]); $student = $sq->fetch();
     $feq = $pdo->prepare('SELECT * FROM form_e WHERE user_id=?'); $feq->execute([$studentId]); $fe = $feq->fetch();
 
+    $feStatusLabels = [
+        'pending_evaluation'      => ['Awaiting your evaluation', 'b-warning'],
+        'evaluated'               => ['Evaluated', 'b-warning'],
+        'pending_admin_review'    => ['Forwarded to Super Admin', 'b-info'],
+        'pending_founder_approval'=> ['Awaiting Founder approval', 'b-info'],
+        'finalized'               => ['Approved & Issued', 'b-success'],
+    ];
+
     if (!$student || !$fe) {
         echo '<div class="glass card-pad">This student does not have an approved Form E record yet.</div>';
+    } elseif ($fe['status'] !== 'pending_evaluation' && $role !== 'super_admin' && $role !== 'founder') {
+        // Locked: it's moved past this stage. Only re-appears here if returned.
+        [$lbl, $cls] = $feStatusLabels[$fe['status']] ?? [$fe['status'], 'b-muted'];
+        ?>
+        <div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
+          <div>
+            <h1 class="serif mb-0" style="font-size:30px">Evaluate — <?= e($student['name']) ?></h1>
+            <p class="muted mb-0"><?= e($student['reg_number'] ?? 'N/A') ?> · <?= e($student['email']) ?></p>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="<?= base_url('mentor/form_e_evaluate.php') ?>"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+        </div>
+        <div class="glass card-pad">
+          <div class="alert alert-info mb-3"><i class="bi bi-lock-fill me-2"></i>This evaluation has been forwarded and is locked here — <span class="badge <?= $cls ?>"><?= e($lbl) ?></span>. You'll be able to edit it again only if it's sent back for changes.</div>
+          <a class="btn btn-outline-light btn-sm" href="<?= base_url('mentor/form_e_evaluate.php?view=preview&student=' . $studentId) ?>" target="_blank"><i class="bi bi-eye me-1"></i>Preview current state</a>
+        </div>
+        <?php
     } else {
         fe_autopopulate_tasks($pdo, (int)$fe['id'], $studentId);
         $tq = $pdo->prepare('SELECT * FROM form_e_tasks WHERE form_e_id=? ORDER BY position'); $tq->execute([$fe['id']]);
@@ -155,7 +189,8 @@ if ($studentId) {
         <div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
           <div>
             <h1 class="serif mb-0" style="font-size:30px">Evaluate — <?= e($student['name']) ?></h1>
-            <p class="muted mb-0"><?= e($student['reg_number'] ?? 'N/A') ?> · <?= e($student['email']) ?> · Status: <span class="badge <?= $fe['status']==='finalized'?'b-success':'b-warning' ?>"><?= ucfirst(str_replace('_',' ',$fe['status'])) ?></span></p>
+            <?php [$curLbl, $curCls] = $feStatusLabels[$fe['status']] ?? [$fe['status'], 'b-muted']; ?>
+            <p class="muted mb-0"><?= e($student['reg_number'] ?? 'N/A') ?> · <?= e($student['email']) ?> · Status: <span class="badge <?= $curCls ?>"><?= e($curLbl) ?></span></p>
           </div>
           <div class="d-flex gap-2">
             <a class="btn btn-outline-light btn-sm" href="<?= base_url('mentor/form_e_evaluate.php?view=preview&student=' . $studentId) ?>" target="_blank"><i class="bi bi-eye me-1"></i>Preview</a>
@@ -212,18 +247,20 @@ if ($studentId) {
 
           <div class="d-flex gap-2 mt-4 flex-wrap">
             <button class="btn btn-outline-light" name="action" value="save_draft"><i class="bi bi-save me-1"></i>Save Draft</button>
-            <button class="btn btn-primary" name="action" value="finalize" onclick="return confirm('Finalize and issue this Form E? The student will immediately be able to view/print it.')"><i class="bi bi-check2-circle me-1"></i>Finalize &amp; Issue Form E</button>
+            <button class="btn btn-primary" name="action" value="submit_review" onclick="return confirm('Submit this evaluation for Super Admin review? You will not be able to edit it here until it is either approved onward or sent back to you.')"><i class="bi bi-send-check me-1"></i>Submit for Review</button>
           </div>
         </form>
         <?php
     }
 } else {
-    // ── Evaluable-students list ──
-    if ($user['role'] === 'super_admin') {
+    // ── Evaluable-students list — locked to students currently AT this stage;
+    // once submitted for review, a record disappears from here until returned. ──
+    if (is_admin_role($user['role'])) {
         $students = $pdo->query("
             SELECT DISTINCT u.id, u.name, u.email, p.reg_number, fe.status AS fe_status
             FROM form_e fe JOIN users u ON u.id = fe.user_id LEFT JOIN profiles p ON p.user_id = u.id
-            ORDER BY (fe.status='finalized'), u.name
+            WHERE fe.status = 'pending_evaluation'
+            ORDER BY u.name
         ")->fetchAll();
     } else {
         $students = $pdo->prepare("
@@ -232,8 +269,8 @@ if ($studentId) {
             JOIN team_members tm_student ON tm_student.user_id = u.id
             JOIN team_members tm_mentor  ON tm_mentor.team_id = tm_student.team_id AND tm_mentor.user_id = ?
             JOIN form_e fe ON fe.user_id = u.id
-            WHERE u.role='intern'
-            ORDER BY (fe.status='finalized'), u.name
+            WHERE u.role='intern' AND fe.status = 'pending_evaluation'
+            ORDER BY u.name
         ");
         $students->execute([(int)$user['id']]);
         $students = $students->fetchAll();
@@ -242,7 +279,7 @@ if ($studentId) {
     <div class="d-flex justify-content-between align-items-end mb-4">
       <div>
         <h1 class="serif mb-0" style="font-size:34px">Evaluate Form E</h1>
-        <p class="muted mb-0">Students whose Form E access has been approved by Super Admin and are ready for evaluation.</p>
+        <p class="muted mb-0">Students whose Form E access has been approved and are awaiting your evaluation. Once submitted for review, a record moves off this list until it's approved or sent back to you.</p>
       </div>
     </div>
     <div class="glass card-pad">
@@ -256,7 +293,7 @@ if ($studentId) {
           <div class="muted" style="font-size:12px"><?= e($s['email']) ?></div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <span class="badge <?= $s['fe_status']==='finalized'?'b-success':'b-warning' ?>"><?= ucfirst(str_replace('_',' ',$s['fe_status'])) ?></span>
+          <span class="badge b-warning">Awaiting evaluation</span>
           <a class="btn btn-outline-light btn-sm" href="<?= base_url('mentor/form_e_evaluate.php?student=' . (int)$s['id']) ?>">Open</a>
         </div>
       </div>

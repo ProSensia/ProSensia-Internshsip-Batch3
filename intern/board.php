@@ -4,7 +4,7 @@ require __DIR__ . '/../includes/header.php';
 require_login();
 $uid = (int)$user['id'];
 
-if ($role === 'super_admin') {
+if (is_admin_role($role)) {
     // Super admin: full read-only overview of all team boards
     $teams = $pdo->query('SELECT * FROM teams ORDER BY name')->fetchAll();
     ?>

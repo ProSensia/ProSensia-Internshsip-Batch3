@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/security.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $me = current_user();
-    if (($me['role'] ?? '') !== 'super_admin') { http_response_code(403); exit('Forbidden'); }
+    if (!is_admin_role($me['role'] ?? '')) { http_response_code(403); exit('Forbidden'); }
     $a = $_POST['action'] ?? ''; $id = (int)($_POST['id'] ?? 0);
 
     if ($a === 'approve') {
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $page_title = 'Form E Eligibility'; $page_section = 'Administration'; $page_label = 'Form E Eligibility';
 require __DIR__ . '/../includes/header.php';
 require_role(['super_admin', 'management']);
-$is_admin = $user['role'] === 'super_admin';
+$is_admin = is_admin_role($user['role']);
 
 $pending = $pdo->query("
     SELECT r.*, u.name, u.email, p.reg_number

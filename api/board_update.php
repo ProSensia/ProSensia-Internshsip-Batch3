@@ -21,12 +21,12 @@ if (!in_array($status, ['todo','in_progress','done'], true) || !$card_id) {
 // Authorization
 if ($scope === 'personal') {
     $own = $pdo->prepare('SELECT owner_user_id FROM kanban_cards WHERE id=?'); $own->execute([$card_id]);
-    if ((int)$own->fetchColumn() !== $uid && $user['role'] !== 'super_admin') {
+    if ((int)$own->fetchColumn() !== $uid && !is_admin_role($user['role'])) {
         http_response_code(403); echo json_encode(['ok'=>false,'err'=>'forbidden']); exit;
     }
 } elseif ($scope === 'team') {
     if (!$team_id) { http_response_code(400); echo json_encode(['ok'=>false,'err'=>'no_team']); exit; }
-    if (!in_array($user['role'], ['super_admin','management','mentor'], true)) {
+    if (!in_array($user['role'], ['super_admin','management','mentor','founder'], true)) {
         $m = $pdo->prepare('SELECT 1 FROM team_members WHERE team_id=? AND user_id=?'); $m->execute([$team_id,$uid]);
         if (!$m->fetchColumn()) { http_response_code(403); echo json_encode(['ok'=>false,'err'=>'not_member']); exit; }
     }

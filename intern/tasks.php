@@ -857,7 +857,7 @@ async function startWizard(eng) {
   <?php if (in_array($role,['mentor','super_admin','management'],true)): ?>
   <div class="d-flex gap-2">
     <a class="btn btn-primary" href="<?= base_url('admin/import_daily_drop.php') ?>"><i class="bi bi-cloud-arrow-up me-1"></i>Import Daily Drop</a>
-    <?php if ($role==='super_admin'): ?>
+    <?php if (is_admin_role($role)): ?>
     <a class="btn btn-ghost" href="<?= base_url('admin/task_log.php') ?>"><i class="bi bi-clock-history me-1"></i>Version Log</a>
     <?php endif; ?>
   </div>

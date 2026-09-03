@@ -10,7 +10,7 @@ $channels[] = ['key'=>'channel:announcements','label'=>'📢 #announcements','su
 $channels[] = ['key'=>'channel:general','label'=>'# general','sub'=>'Everyone','pinned'=>false];
 
 // Team channels (interns only see their own teams)
-if (in_array($role,['super_admin','management','mentor'],true)) {
+if (in_array($role,['super_admin','management','mentor','founder'],true)) {
     $teamsAll = $pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll();
 } else {
     $teamsQ = $pdo->prepare('SELECT t.id,t.name FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? ORDER BY t.name');
@@ -21,9 +21,9 @@ foreach($teamsAll as $t) {
 }
 
 // DMs — ordered by role priority: super_admin → management → mentor → intern
-$peers = $pdo->prepare("SELECT id,name,role FROM users WHERE id<>? ORDER BY FIELD(role,'super_admin','management','mentor','intern'), name");
+$peers = $pdo->prepare("SELECT id,name,role FROM users WHERE id<>? ORDER BY FIELD(role,'founder','super_admin','management','mentor','intern'), name");
 $peers->execute([$uid]);
-$role_icons = ['super_admin'=>'👑 ', 'management'=>'🏢 ', 'mentor'=>'🎓 ', 'intern'=>''];
+$role_icons = ['founder'=>'⭐ ', 'super_admin'=>'👑 ', 'management'=>'🏢 ', 'mentor'=>'🎓 ', 'intern'=>''];
 foreach($peers->fetchAll() as $p) {
     $ids = [$uid,(int)$p['id']]; sort($ids);
     $icon = $role_icons[$p['role']] ?? '';
@@ -31,7 +31,7 @@ foreach($peers->fetchAll() as $p) {
         'key'   => 'dm:'.$ids[0].'|'.$ids[1],
         'label' => $icon.'DM · '.$p['name'],
         'sub'   => role_label($p['role']),
-        'pinned'=> $p['role']==='super_admin',
+        'pinned'=> is_admin_role($p['role']),
         'role'  => $p['role'],
     ];
 }
@@ -42,7 +42,7 @@ $active = $_GET['ch'] ?? $channels[0]['key'];
 if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='send') {
     $ch  = $_POST['channel'];
     $can = true;
-    if ($ch === 'channel:announcements' && $role !== 'super_admin') $can = false;
+    if ($ch === 'channel:announcements' && !is_admin_role($role)) $can = false;
     if ($can) {
         $text   = trim($_POST['text'] ?? '');
         $att_path = null; $att_name = null;
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='send') {
 $msgs = $pdo->prepare('SELECT m.*, u.name FROM chat_messages m JOIN users u ON u.id=m.from_id WHERE m.channel_key=? ORDER BY m.created_at ASC LIMIT 200');
 $msgs->execute([$active]);
 $messages = $msgs->fetchAll();
-$canPost = !($active==='channel:announcements' && $role!=='super_admin');
+$canPost = !($active==='channel:announcements' && !is_admin_role($role));
 ?>
 <h1 class="serif mb-4" style="font-size:38px">Messages</h1>
 
