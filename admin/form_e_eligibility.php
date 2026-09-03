@@ -84,8 +84,16 @@ $decided = $pdo->query("
     <h1 class="serif mb-0" style="font-size:34px">Form E Eligibility</h1>
     <p class="muted mb-0">Approve or reject which students may access Form E. Not every student is eligible — removed/terminated interns should be rejected.</p>
   </div>
-  <span class="badge b-warning"><?= count($pending) ?> pending</span>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge b-warning"><?= count($pending) ?> pending</span>
+    <?php if ($is_admin): ?>
+    <a class="btn btn-outline-light btn-sm" href="<?= base_url('admin/form_e_preview_sample.php') ?>" target="_blank">
+      <i class="bi bi-eye me-1"></i>Preview sample Form E
+    </a>
+    <?php endif; ?>
+  </div>
 </div>
+<p class="muted mb-3" style="font-size:12.5px"><i class="bi bi-info-circle me-1"></i>"Preview sample Form E" shows the exact document layout with placeholder data — use it to review the design any time, independent of any real student's data.</p>
 
 <div class="glass card-pad mb-3">
   <h5 class="serif mb-3"><i class="bi bi-hourglass-split me-2"></i>Pending requests</h5>
@@ -128,6 +136,7 @@ $decided = $pdo->query("
         <div class="d-flex align-items-start gap-2">
           <span class="badge <?= $r['status']==='approved'?'b-success':'b-danger' ?>"><?= ucfirst($r['status']) ?></span>
           <?php if ($is_admin && $r['fe_id']): ?>
+          <a class="btn btn-ghost btn-sm" href="<?= base_url('mentor/form_e_evaluate.php?view=preview&student=' . (int)$r['user_id']) ?>" target="_blank" title="Preview this student's Form E as filled so far"><i class="bi bi-eye"></i></a>
           <button type="button" class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#feEdit<?= (int)$r['fe_id'] ?>" title="Edit org/supervisor"><i class="bi bi-pencil"></i></button>
           <?php endif; ?>
         </div>

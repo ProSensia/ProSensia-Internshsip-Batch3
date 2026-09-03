@@ -121,45 +121,43 @@ if ($role==='intern') {
 
 <?php
 $issued = array_filter($items, fn($i)=>$i['status']==='issued');
-if ($issued): foreach($issued as $c): $verifyUrl = cert_verify_url_for($pdo, $c); ?>
-  <?php if ($c['request_type'] === 'experience_letter'): ?>
+if ($issued): foreach($issued as $c):
+    $verifyUrl = cert_verify_url_for($pdo, $c);
+    $isLetter  = $c['request_type'] === 'experience_letter';
+?>
   <div class="cert mb-4">
-    <div class="seal">P</div>
-    <h2>Experience Letter</h2>
+    <span class="cert-corner tl"></span><span class="cert-corner tr"></span>
+    <span class="cert-corner bl"></span><span class="cert-corner br"></span>
+    <div class="cert-shine"></div>
+    <div class="cert-top">
+      <img src="<?= logo_url() ?>" alt="ProSensia">
+      <span class="cert-tag">Official Document</span>
+    </div>
+    <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
+    <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
     <p class="text-center muted">This is to certify that</p>
     <div class="recipient"><?= e($c['name']) ?></div>
-    <p class="text-center muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
-    <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-    <p class="text-center" style="color:#f0d78c;font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
+    <?php if ($isLetter): ?>
+      <p class="text-center muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
+      <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+      <p class="text-center" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
+    <?php else: ?>
+      <p class="text-center muted">has successfully completed the</p>
+      <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+      <?php if ($c['mentor_rating']): ?><p class="text-center" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
+    <?php endif; ?>
     <div class="meta">
-      <div>Serial · <b style="color:#fff"><?= e($c['serial']) ?></b></div>
-      <div>Issued · <?= e(date('M j, Y', strtotime($c['issued_at']))) ?></div>
+      <div>Doc ID · <b><?= e($c['serial']) ?></b></div>
+      <div>Issued · <b><?= e(date('M j, Y', strtotime($c['issued_at']))) ?></b></div>
+      <?php if (!$isLetter): ?><div>Grade · <b><?= e($c['final_grade']) ?></b></div><?php endif; ?>
     </div>
     <div class="text-center mt-3">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px">
-      <div class="small-cap mt-2">Scan to verify</div>
+      <div class="cert-qr-wrap">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=112x112&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px;display:block">
+      </div>
+      <div class="small-cap mt-2">Scan to verify · ProSensia Document Registry</div>
     </div>
   </div>
-  <?php else: ?>
-  <div class="cert mb-4">
-    <div class="seal">P</div>
-    <h2>Certificate of Internship Completion</h2>
-    <p class="text-center muted">This is to certify that</p>
-    <div class="recipient"><?= e($c['name']) ?></div>
-    <p class="text-center muted">has successfully completed the</p>
-    <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-    <?php if ($c['mentor_rating']): ?><p class="text-center" style="color:#f0d78c">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
-    <div class="meta">
-      <div>Serial · <b style="color:#fff"><?= e($c['serial']) ?></b></div>
-      <div>Issued · <?= e(date('M j, Y', strtotime($c['issued_at']))) ?></div>
-      <div>Grade · <b style="color:#fff"><?= e($c['final_grade']) ?></b></div>
-    </div>
-    <div class="text-center mt-3">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px">
-      <div class="small-cap mt-2">Scan to verify</div>
-    </div>
-  </div>
-  <?php endif; ?>
 <?php endforeach; endif; ?>
 
 <div class="glass card-pad">
