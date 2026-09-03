@@ -422,13 +422,20 @@ if ($role === 'intern') {
 }
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Attach checkpoints
+// Attach checkpoints — one batched query for all multi-day tasks instead of
+// one query per task (this list is unfiltered-by-date for mentor/admin, so it
+// can be every daily_tasks row ever created; querying per-row there was the
+// difference between a handful of queries and hundreds).
+$multiDayIds = array_column(array_filter($tasks, fn($t) => $t['cadence'] === 'multi_day'), 'id');
+$checkpointsByTask = [];
+if ($multiDayIds) {
+    $placeholders = implode(',', array_fill(0, count($multiDayIds), '?'));
+    $cq = $pdo->prepare("SELECT * FROM task_checkpoints WHERE task_id IN ($placeholders) ORDER BY task_id, day_no");
+    $cq->execute($multiDayIds);
+    foreach ($cq->fetchAll(PDO::FETCH_ASSOC) as $cp) { $checkpointsByTask[$cp['task_id']][] = $cp; }
+}
 foreach ($tasks as &$t) {
-    $t['checkpoints'] = [];
-    if ($t['cadence'] === 'multi_day') {
-        $q = $pdo->prepare('SELECT * FROM task_checkpoints WHERE task_id=? ORDER BY day_no');
-        $q->execute([$t['id']]); $t['checkpoints'] = $q->fetchAll(PDO::FETCH_ASSOC);
-    }
+    $t['checkpoints']  = $t['cadence'] === 'multi_day' ? ($checkpointsByTask[$t['id']] ?? []) : [];
     $t['video_url']    = $t['video_url']    ?? '';
     $t['target_field'] = $t['target_field'] ?? '';
 }

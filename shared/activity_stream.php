@@ -1,6 +1,11 @@
 <?php
 // Server-Sent Events (SSE) — live activity feed
-// Streams recent task completions and check-ins as they happen
+// Superseded by shared/activity_poll.php (short-interval polling) — holding
+// a PHP worker open for up to 90s per connection was letting a handful of
+// simultaneously-open dashboards exhaust the shared host's worker pool and
+// stall every other page on the site. Nothing in the app links here anymore;
+// this file is kept only in case something external still points at it, with
+// its runtime capped low so a stray request can't reproduce that problem.
 require_once __DIR__ . '/../includes/auth.php';
 require_login();
 
@@ -18,8 +23,9 @@ function send_event(string $event, array $data): void {
     flush();
 }
 
-// Poll for new events every 4 seconds, max 90 seconds per connection
-$max_time  = time() + 90;
+// Poll for new events every 4 seconds, max 8 seconds per connection (capped
+// low — see note above; the client-side feed no longer uses this endpoint).
+$max_time  = time() + 8;
 $last_id   = (int)($_GET['last_id'] ?? 0);
 
 while (time() < $max_time) {

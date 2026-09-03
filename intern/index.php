@@ -115,9 +115,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const orig = bubbleEl.textContent;
     bubbleEl.textContent = '';
     eng.speak(orig);
-    // typewriter effect
+    // Typewriter effect, capped so a long greeting never takes more than
+    // ~400ms total to finish (was a fixed 22ms/char — several seconds for
+    // a full sentence, the biggest part of "starting for the first time"
+    // feeling slow).
     let i = 0;
-    const iv = setInterval(function(){ bubbleEl.textContent += orig[i++]; if(i>=orig.length) clearInterval(iv); }, 22);
+    const perChar = Math.max(2, Math.min(22, 400 / Math.max(orig.length, 1)));
+    const iv = setInterval(function(){ bubbleEl.textContent += orig[i++]; if(i>=orig.length) clearInterval(iv); }, perChar);
   }
 });
 </script>
@@ -229,31 +233,38 @@ document.addEventListener('DOMContentLoaded', function() {
     while (feedEl.children.length > 12) feedEl.removeChild(feedEl.lastChild);
   }
 
-  if (typeof EventSource !== 'undefined') {
-    const src = new EventSource('<?= base_url('shared/activity_stream.php') ?>?last_id=' + lastId);
+  // Short-interval polling instead of a long-lived SSE connection — each
+  // request answers immediately and releases its PHP worker, so multiple
+  // students with the dashboard open don't compete for the shared host's
+  // limited concurrent-process pool the way a 90-second-held connection did.
+  const pollUrl = '<?= base_url('shared/activity_poll.php') ?>';
+  let pollFailures = 0;
 
-    src.addEventListener('task_done', function(e) {
-      const d = JSON.parse(e.data);
-      lastId = Math.max(lastId, d.id || 0);
-      addFeedItem('bi-check-circle-fill','#34d399', `<strong>${d.name}</strong> completed <em>${d.task}</em>`, d.time);
-    });
-
-    src.addEventListener('check_in', function(e) {
-      const d = JSON.parse(e.data);
-      addFeedItem('bi-box-arrow-in-right','#60a5fa', `<strong>${d.name}</strong> checked in (${d.status})`, d.time);
-    });
-
-    src.addEventListener('ping', function() {
-      if (dotEl) { dotEl.style.background='#34d399'; setTimeout(()=>{ if(dotEl) dotEl.style.background='#34d399'; },300); }
-    });
-
-    src.onerror = function() {
+  async function poll() {
+    try {
+      const res = await fetch(pollUrl + '?last_id=' + lastId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const d = await res.json();
+      pollFailures = 0;
+      if (dotEl) dotEl.style.background = '#34d399';
+      if (d && d.ok) {
+        lastId = Math.max(lastId, d.last_id || 0);
+        (d.events || []).forEach(function(ev) {
+          if (ev.type === 'task_done') {
+            addFeedItem('bi-check-circle-fill', '#34d399', `<strong>${ev.name}</strong> completed <em>${ev.task}</em>`, ev.time);
+          } else if (ev.type === 'check_in') {
+            addFeedItem('bi-box-arrow-in-right', '#60a5fa', `<strong>${ev.name}</strong> checked in (${ev.status})`, ev.time);
+          }
+        });
+      }
+    } catch (e) {
+      pollFailures++;
       if (dotEl) dotEl.style.background = '#ef4444';
-      if (placeholder && feedEl.children.length === 0) placeholder.textContent = 'Feed offline — refresh to reconnect';
-    };
-  } else {
-    if (placeholder) placeholder.textContent = 'Live feed not supported in this browser.';
+      if (pollFailures >= 3 && placeholder && feedEl.children.length === 0) placeholder.textContent = 'Feed offline — refresh to reconnect';
+    }
   }
+
+  poll();
+  setInterval(poll, 6000);
 })();
 </script>
 

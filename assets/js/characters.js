@@ -307,7 +307,11 @@ class CharEngine {
     this.def   = PS_CHARS[charKey] || PS_CHARS.ac;
     this.synth = window.speechSynthesis || null;
     this.voice = null;
-    this.muted = localStorage.getItem('ps_voice_off') === '1';
+    // Voice is opt-IN, not opt-out: text-to-speech init/playback is a real
+    // source of multi-second perceived lag on first load (especially on
+    // low-end/mobile devices), so only speak once a user has explicitly
+    // turned it on (setMuted(false) writes 'ps_voice_off'='0').
+    this.muted = localStorage.getItem('ps_voice_off') !== '0';
     this._typing = false;
     this._avatarEl = null;
     this._textEl   = null;
@@ -360,7 +364,13 @@ class CharEngine {
 
   async type(text, speed) {
     if (!this._textEl) return;
-    speed = speed || 20;
+    // Cap the total animation time regardless of message length or the speed
+    // passed in — a long line at a fixed per-character delay used to take
+    // several seconds to finish "typing", which is most of what made
+    // starting the daily wizard feel slow.
+    const MAX_TOTAL_MS = 400;
+    const requested = speed || 20;
+    speed = Math.min(requested, Math.max(2, MAX_TOTAL_MS / Math.max(text.length, 1)));
     this._typing = true;
     this._textEl.innerHTML = '';
     const cur = document.createElement('span');
