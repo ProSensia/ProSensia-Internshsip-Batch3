@@ -1,11 +1,21 @@
 <?php
 // includes/connection.php — central MySQL connection (PDO).
 // Edit credentials below to match your local / cPanel server.
-// date_default_timezone_set('Asia/Karachi'); 
+// date_default_timezone_set('Asia/Karachi');
 // $pdo->exec("SET time_zone = '+05:00'");
 
-
-$DB_HOST = 'premium281.web-hosting.com';
+// Use 'localhost' whenever the PHP files and the MySQL database are on the
+// SAME hosting account (the normal case on Namecheap/cPanel shared hosting —
+// note the "prosdfwo_" cPanel account prefix on the DB name/user below).
+// Connecting via the external hostname instead of localhost routes every
+// query out through the server's public network edge and back in, which
+// shared hosts often throttle — this is what was causing every page to take
+// minutes to load. Only use the external hostname (uncomment below) if PHP
+// is running somewhere OTHER than this same hosting account (e.g. a local
+// XAMPP install) AND "Remote MySQL" access has been enabled in cPanel for
+// that machine's IP.
+$DB_HOST = 'localhost';
+// $DB_HOST = 'premium281.web-hosting.com';
 $DB_NAME = 'prosdfwo_internship_batch3';
 $DB_USER = 'prosdfwo_internship_batch3';
 $DB_PASS = 'InternshipBatch3';
