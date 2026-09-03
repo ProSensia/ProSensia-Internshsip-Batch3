@@ -10,7 +10,7 @@ function col_exists(PDO $pdo, $table, $col) {
 }
 function run_silent(PDO $pdo, $sql) { try { $pdo->exec($sql); } catch (Exception $e) {} }
 
-$_SCHEMA_TARGET = 7;
+$_SCHEMA_TARGET = 8;
 $_db_ver = 0;
 try {
     $_db_ver = (int)($pdo->query("SELECT v FROM settings WHERE k='schema_ver'")->fetchColumn() ?: 0);
@@ -121,6 +121,108 @@ try {
         UNIQUE KEY role_page (role, page_key)
     ) ENGINE=InnoDB");
 
+    // Phase 8: Form E eligibility + evaluation, unified document security/QR
+    // (Form E, Certificate, Experience Letter), certificate_requests extension,
+    // audit trail. Form C / Admit Card keep their own legacy mechanism untouched.
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS form_e_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        status ENUM('pending','approved','rejected') DEFAULT 'pending',
+        reviewer_note VARCHAR(255) NULL,
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP NULL,
+        reviewed_by INT NULL,
+        INDEX(user_id), INDEX(status),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB");
+
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS form_e (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL UNIQUE,
+        request_id INT NULL,
+        organization VARCHAR(160) DEFAULT 'ProSensia (SMC-Private Limited)',
+        org_city VARCHAR(120) NULL,
+        industry_supervisor_name VARCHAR(160) DEFAULT 'Momin Khan',
+        industry_supervisor_designation VARCHAR(160) DEFAULT 'Founder / Director / CEO',
+        start_date DATE NULL, end_date DATE NULL,
+        diary_maintained ENUM('yes','no','not_relevant') NULL,
+        attendance_pct ENUM('75','90','100') NULL,
+        professional_attitude ENUM('poor','good','excellent') NULL,
+        teamwork_rating ENUM('poor','good','excellent') NULL,
+        report_submitted ENUM('yes','no') NULL,
+        certificate_attached ENUM('yes','no') NULL,
+        supervisor_comments TEXT NULL,
+        academic_supervisor_name VARCHAR(160) NULL,
+        evaluator_id INT NULL,
+        evaluated_at TIMESTAMP NULL,
+        status ENUM('pending_evaluation','evaluated','finalized') DEFAULT 'pending_evaluation',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(status), INDEX(evaluator_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB");
+
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS form_e_tasks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        form_e_id INT NOT NULL,
+        position TINYINT NOT NULL,
+        task_text VARCHAR(500) NOT NULL,
+        rating ENUM('high_performance','average','inadequate') NULL,
+        source ENUM('auto_assignment','auto_daily_task','manual') DEFAULT 'manual',
+        source_ref_id INT NULL,
+        UNIQUE KEY form_e_position (form_e_id, position),
+        FOREIGN KEY (form_e_id) REFERENCES form_e(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB");
+
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS documents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        doc_uid VARCHAR(40) NOT NULL UNIQUE,
+        doc_type ENUM('form_e','certificate','experience_letter') NOT NULL,
+        ref_table VARCHAR(40) NOT NULL,
+        ref_id INT NOT NULL,
+        user_id INT NOT NULL,
+        version INT NOT NULL DEFAULT 1,
+        content_hash VARCHAR(64) NOT NULL,
+        token VARCHAR(64) NOT NULL,
+        status ENUM('active','revoked') DEFAULT 'active',
+        issued_at TIMESTAMP NULL,
+        issued_by INT NULL,
+        revoked_at TIMESTAMP NULL,
+        revoked_by INT NULL,
+        revoke_reason VARCHAR(255) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY ref_unique (doc_type, ref_table, ref_id),
+        INDEX(user_id), INDEX(doc_type), INDEX(status)
+    ) ENGINE=InnoDB");
+
+    run_silent($pdo,"CREATE TABLE IF NOT EXISTS audit_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        actor_id INT NULL,
+        action VARCHAR(60) NOT NULL,
+        entity_type VARCHAR(40) NOT NULL,
+        entity_id INT NOT NULL,
+        meta TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(entity_type, entity_id), INDEX(actor_id), INDEX(created_at)
+    ) ENGINE=InnoDB");
+
+    if (!col_exists($pdo,'certificate_requests','request_type'))
+        run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN request_type ENUM('certificate','experience_letter') NOT NULL DEFAULT 'certificate' AFTER batch");
+    if (!col_exists($pdo,'certificate_requests','linkedin_url'))
+        run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN linkedin_url VARCHAR(200) NULL AFTER request_type");
+
+    // One-time HMAC signing secret for the unified document verification system.
+    // Stored in settings like every other config value in this app (there is no
+    // .env convention here — see includes/connection.php's own DB credentials).
+    $_hasKey = (int)$pdo->query("SELECT COUNT(*) FROM settings WHERE k='doc_signing_key'")->fetchColumn();
+    if (!$_hasKey) {
+        $_key = bin2hex(random_bytes(32));
+        run_silent($pdo, "INSERT INTO settings(k,v) VALUES('doc_signing_key', " . $pdo->quote($_key) . ")");
+    }
+    run_silent($pdo,"INSERT IGNORE INTO settings(k,v) VALUES
+        ('form_e_org_name','ProSensia (SMC-Private Limited)'),
+        ('form_e_supervisor_name','Momin Khan'),
+        ('form_e_supervisor_title','Founder / Director / CEO')");
+
     // Stamp version so subsequent loads skip everything above
-    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','7') ON DUPLICATE KEY UPDATE v='7'");
+    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','8') ON DUPLICATE KEY UPDATE v='8'");
 } catch (Exception $e) {}

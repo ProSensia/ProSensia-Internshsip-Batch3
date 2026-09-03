@@ -6,7 +6,7 @@ require_role(['super_admin']);
 if ($_SERVER['REQUEST_METHOD']==='POST') {
   $a = $_POST['action'] ?? '';
   if ($a==='save_text') {
-    foreach (['cert_batch','cert_signatory'] as $k) {
+    foreach (['cert_batch','cert_signatory','form_e_org_name','form_e_supervisor_name','form_e_supervisor_title'] as $k) {
       $v = $_POST[$k] ?? '';
       $pdo->prepare('INSERT INTO settings(k,v) VALUES(?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)')->execute([$k,$v]);
     }
@@ -41,6 +41,9 @@ $logo = setting('logo_path','assets/img/prosensia-logo.png');
 $partner = setting('partner_logo_path','');
 $batch = setting('cert_batch','Batch 3 — Summer 2026');
 $sig = setting('cert_signatory','Aisha Khan, Director — ProSensia');
+$feOrg = setting('form_e_org_name','ProSensia (SMC-Private Limited)');
+$feSupName = setting('form_e_supervisor_name','Momin Khan');
+$feSupTitle = setting('form_e_supervisor_title','Founder / Director / CEO');
 $unlock_hour = (int)setting('daily_unlock_hour', 9);
 $unlock_min  = (int)setting('daily_unlock_min',  0);
 ?>
@@ -108,6 +111,19 @@ $unlock_min  = (int)setting('daily_unlock_min',  0);
         <input type="hidden" name="action" value="save_text">
         <div class="col-md-6"><label class="form-label">Default batch label</label><input class="form-control" name="cert_batch" value="<?= e($batch) ?>"></div>
         <div class="col-md-6"><label class="form-label">Signatory line</label><input class="form-control" name="cert_signatory" value="<?= e($sig) ?>"></div>
+        <div class="col-12"><button class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="glass card-pad">
+      <h5 class="serif">Form E defaults</h5>
+      <p class="muted mb-2" style="font-size:13px">Used to seed each student's Form E when their access is approved (per-student values can still be edited individually on the Form E Eligibility page).</p>
+      <form method="post" class="row g-3 mt-1">
+        <input type="hidden" name="action" value="save_text">
+        <div class="col-md-4"><label class="form-label">Organization / Industry name</label><input class="form-control" name="form_e_org_name" value="<?= e($feOrg) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Industry Supervisor name</label><input class="form-control" name="form_e_supervisor_name" value="<?= e($feSupName) ?>"></div>
+        <div class="col-md-4"><label class="form-label">Supervisor designation</label><input class="form-control" name="form_e_supervisor_title" value="<?= e($feSupTitle) ?>"></div>
         <div class="col-12"><button class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button></div>
       </form>
     </div>

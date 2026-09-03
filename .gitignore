@@ -1,0 +1,10 @@
+# Runtime-generated files (QR codes, resolved logos) created by formc_pdf.php,
+# admit_card.php, and the new Form E/Certificate QR flow.
+/temp/
+
+# Claude Code session-local state — never part of the app.
+/.claude/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db

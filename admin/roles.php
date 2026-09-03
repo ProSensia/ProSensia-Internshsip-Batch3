@@ -50,6 +50,8 @@ $sections = [
         'intern/assignments.php'  => 'Assignments',
         'intern/motivation.php'   => 'Motivation & Goals',
         'intern/formc.php'        => 'Form C',
+        'intern/form_e.php'       => 'Form E',
+        'intern/documents.php'    => 'Forms & Documents',
         'intern/enrollment.php'   => 'Enrollment',
         'intern/profile.php'      => 'Intern Profiles',
     ],
@@ -60,6 +62,7 @@ $sections = [
         'shared/teams.php'        => 'Teams',
         'shared/certificates.php' => 'Certificates',
         'shared/subscriptions.php'=> 'Subscriptions',
+        'mentor/form_e_evaluate.php' => 'Evaluate Form E',
     ],
     'Reporting & Tools' => [
         'mentor/daily_report.php'     => 'Daily Intern Report',
@@ -73,6 +76,8 @@ $sections = [
         'admin/import.php'  => 'Bulk Import',
         'admin/settings.php'=> 'Settings',
         'admin/security.php'=> 'Security',
+        'admin/form_e_eligibility.php' => 'Form E Eligibility',
+        'admin/documents.php'          => 'Document Registry',
     ],
 ];
 

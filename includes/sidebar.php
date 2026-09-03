@@ -43,6 +43,9 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (has_perm($role,'shared/materials.php')): nav_link('shared/materials.php','bi-book','Materials'); endif; ?>
   <?php if (has_perm($role,'shared/attendance.php')): nav_link('shared/attendance.php','bi-calendar-check','Attendance'); endif; ?>
   <?php if (has_perm($role,'intern/formc.php')): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
+  <?php if (has_perm($role,'intern/form_e.php')): nav_link('intern/form_e.php','bi-clipboard2-check','Form E'); endif; ?>
+  <?php if (has_perm($role,'intern/documents.php')): nav_link('intern/documents.php','bi-folder2-open','Forms & Documents'); endif; ?>
+  <?php if (has_perm($role,'mentor/form_e_evaluate.php')): nav_link('mentor/form_e_evaluate.php','bi-clipboard2-pulse','Evaluate Form E'); endif; ?>
   <?php if (has_perm($role,'intern/motivation.php')): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>
   <?php if (has_perm($role,'intern/social_post.php')): nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); endif; ?>
 
@@ -54,6 +57,8 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (has_perm($role,'shared/teams.php')): nav_link('shared/teams.php','bi-diagram-3','Teams'); endif; ?>
   <?php if (has_perm($role,'shared/messages.php')): nav_link('shared/messages.php','bi-chat-dots','Messages'); endif; ?>
   <?php if (has_perm($role,'shared/certificates.php')): nav_link('shared/certificates.php','bi-award','Certificates'); endif; ?>
+  <?php if (has_perm($role,'admin/form_e_eligibility.php')): nav_link('admin/form_e_eligibility.php','bi-person-check','Form E Eligibility'); endif; ?>
+  <?php if (has_perm($role,'admin/documents.php')): nav_link('admin/documents.php','bi-file-earmark-lock2','Document Registry'); endif; ?>
   <?php if (has_perm($role,'shared/subscriptions.php')): nav_link('shared/subscriptions.php','bi-credit-card','Subscriptions'); endif; ?>
   <?php if (has_perm($role,'admin/motivation.php')): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
   <?php if (has_perm($role,'admin/settings.php')): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>

@@ -122,6 +122,11 @@ function _default_perms(): array {
         'intern/formc.php'             => ['intern','super_admin','management'],
         'intern/enrollment.php'        => ['intern','super_admin','management'],
         'intern/profile.php'           => ['intern','super_admin'],
+        'intern/form_e.php'            => ['intern','super_admin'],
+        'intern/documents.php'         => ['intern','super_admin','management'],
+        'mentor/form_e_evaluate.php'   => ['mentor','super_admin'],
+        'admin/form_e_eligibility.php' => ['super_admin','management'],
+        'admin/documents.php'          => ['super_admin','management'],
         'shared/materials.php'         => ['intern','super_admin','mentor','management'],
         'shared/attendance.php'        => ['intern','super_admin','mentor','management'],
         'shared/messages.php'          => ['intern','super_admin','mentor','management'],
@@ -155,4 +160,45 @@ function has_perm(string $role, string $page_key): bool {
     }
     if (isset($perm_cache[$role][$page_key])) return $perm_cache[$role][$page_key];
     return in_array($role, _default_perms()[$page_key] ?? [], true);
+}
+
+// ── Form E "Team Lead" evaluator resolution ─────────────────────────────────
+// There is no dedicated team_lead role — mentors already act as team leads via
+// team_members.role_in_team='lead' (see intern/assignments.php's mentor gate).
+// This mirrors that exact precedent for Form E evaluation authorization.
+
+/** Mentors authorized to evaluate a given student's Form E, most-specific first. */
+function form_e_evaluators_for(int $studentId): array {
+    global $pdo;
+    $leads = $pdo->prepare("
+        SELECT DISTINCT u.id, u.name
+        FROM team_members tm_student
+        JOIN team_members tm_lead ON tm_lead.team_id = tm_student.team_id AND tm_lead.role_in_team = 'lead'
+        JOIN users u ON u.id = tm_lead.user_id AND u.role = 'mentor'
+        WHERE tm_student.user_id = ?
+        ORDER BY u.name
+    ");
+    $leads->execute([$studentId]);
+    $rows = $leads->fetchAll();
+    if ($rows) return $rows;
+
+    // Fallback: any mentor sharing a team with the student (no lead explicitly set).
+    $shared = $pdo->prepare("
+        SELECT DISTINCT u.id, u.name
+        FROM team_members tm_student
+        JOIN team_members tm_mentor ON tm_mentor.team_id = tm_student.team_id
+        JOIN users u ON u.id = tm_mentor.user_id AND u.role = 'mentor'
+        WHERE tm_student.user_id = ?
+        ORDER BY u.name
+    ");
+    $shared->execute([$studentId]);
+    return $shared->fetchAll();
+}
+
+/** True if $mentorUserId may evaluate $studentId's Form E (super_admin always may, checked separately by callers). */
+function can_evaluate_form_e(int $mentorUserId, int $studentId): bool {
+    foreach (form_e_evaluators_for($studentId) as $ev) {
+        if ((int)$ev['id'] === $mentorUserId) return true;
+    }
+    return false;
 }

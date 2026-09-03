@@ -163,8 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <h4 class="serif">Quick links</h4>
     <div class="d-grid gap-2 mt-3">
       <a class="btn btn-outline-light text-start" href="<?= base_url('intern/assignments.php') ?>"><i class="bi bi-clipboard-check me-2"></i>Assignments</a>
-      <a class="btn btn-outline-light text-start" href="<?= base_url('intern/formc.php') ?>"><i class="bi bi-file-earmark-text me-2"></i>Submit Form C</a>
-      <a class="btn btn-outline-light text-start" href="<?= base_url('shared/certificates.php') ?>"><i class="bi bi-award me-2"></i>Certificate</a>
+      <a class="btn btn-outline-light text-start" href="<?= base_url('intern/documents.php') ?>"><i class="bi bi-folder2-open me-2"></i>Forms &amp; Documents</a>
       <a class="btn btn-outline-light text-start" href="<?= base_url('shared/messages.php') ?>"><i class="bi bi-chat-dots me-2"></i>Messages</a>
     </div>
   </div>
