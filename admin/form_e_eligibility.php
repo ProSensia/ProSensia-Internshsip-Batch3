@@ -103,8 +103,10 @@ $decided = $pdo->query("
       <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
         <div>
           <b><?= e($r['name']) ?></b> <span class="muted" style="font-size:13px">(<?= e($r['reg_number'] ?? 'N/A') ?>)</span>
-          <div class="muted" style="font-size:12px"><?= e($r['email']) ?> · Requested <?= e(date('M j, Y', strtotime($r['requested_at']))) ?></div>
+          <div class="muted" style="font-size:12px"><?= e($r['email']) ?> · Requested <?= e(date('M j, Y g:i A', strtotime($r['requested_at']))) ?></div>
         </div>
+        <?php $waitHrs = (time() - strtotime($r['requested_at'])) / 3600; ?>
+        <span class="badge <?= $waitHrs > 48 ? 'b-danger' : ($waitHrs > 24 ? 'b-warning' : 'b-muted') ?>" title="Time since request"><i class="bi bi-clock-history me-1"></i><?= e(time_ago($r['requested_at'])) ?></span>
       </div>
       <?php if ($is_admin): ?>
       <div class="d-flex gap-2 flex-wrap">
@@ -130,6 +132,10 @@ $decided = $pdo->query("
       <div class="d-flex justify-content-between flex-wrap gap-2">
         <div>
           <b><?= e($r['name']) ?></b> <span class="muted" style="font-size:13px">(<?= e($r['reg_number'] ?? 'N/A') ?>)</span>
+          <div class="muted" style="font-size:12px">
+            Requested <?= e(time_ago($r['requested_at'])) ?>
+            <?php if ($r['reviewed_at']): ?> · Decided <?= e(time_ago($r['reviewed_at'])) ?> <span title="Turnaround time">(took <?= e(elapsed_between($r['requested_at'], $r['reviewed_at'])) ?>)</span><?php endif; ?>
+          </div>
           <?php if ($r['status'] === 'rejected' && $r['reviewer_note']): ?><div class="muted" style="font-size:12px">Reason: <?= e($r['reviewer_note']) ?></div><?php endif; ?>
           <?php if ($r['status'] === 'approved' && $r['fe_id']): ?><div class="muted" style="font-size:12px">Evaluation status: <?= e(ucfirst(str_replace('_',' ',$r['fe_status']))) ?></div><?php endif; ?>
         </div>

@@ -170,11 +170,13 @@ if ($issued): foreach($issued as $c):
           <b><?= e($c['name']) ?></b> · <span class="muted"><?= e($c['track']) ?> · <?= e($c['batch']) ?></span>
           <span class="badge b-muted ms-1" style="font-size:10px"><?= $c['request_type']==='experience_letter' ? 'Experience Letter' : 'Certificate' ?></span>
           <div class="muted" style="font-size:12px">
-            Requested <?= e(date('M j, Y', strtotime($c['requested_at']))) ?>
+            Requested <?= e(time_ago($c['requested_at'])) ?>
+            <?php if ($c['status']==='issued' && $c['issued_at']): ?> · Issued <?= e(time_ago($c['issued_at'])) ?> <span title="Turnaround time">(took <?= e(elapsed_between($c['requested_at'], $c['issued_at'])) ?>)</span><?php endif; ?>
             <?php if (!empty($c['linkedin_url']) && preg_match('#^https?://#i', $c['linkedin_url'])): ?> · <a href="<?= e($c['linkedin_url']) ?>" target="_blank" rel="noopener">LinkedIn</a><?php endif; ?>
           </div>
         </div>
-        <span class="badge <?= $c['status']==='issued'?'b-success':($c['status']==='rejected'?'b-danger':'b-warning') ?>"><?= e(ucfirst($c['status'])) ?></span>
+        <?php $waitHrs = $c['status']==='pending' ? (time() - strtotime($c['requested_at'])) / 3600 : 0; ?>
+        <span class="badge <?= $c['status']==='issued'?'b-success':($c['status']==='rejected'?'b-danger':($waitHrs>48?'b-danger':($waitHrs>24?'b-warning':'b-muted'))) ?>"><?= e(ucfirst($c['status'])) ?></span>
       </div>
       <?php if ($role==='super_admin' && $c['status']==='pending'): ?>
       <div class="row g-2 mt-2">

@@ -54,6 +54,35 @@ function flash($msg = null) {
 
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+/** Human-readable relative time, e.g. "3 hours ago" / "2 days ago" — used to
+ *  show how long a Form E / Certificate / Experience Letter request has been
+ *  sitting, both to the requester and to whoever needs to act on it. */
+function time_ago($timestamp): string {
+    if (!$timestamp) return '';
+    $ts = is_numeric($timestamp) ? (int)$timestamp : strtotime((string)$timestamp);
+    if (!$ts) return '';
+    $diff = time() - $ts;
+    if ($diff < 0) $diff = 0;
+    if ($diff < 60)     return 'just now';
+    if ($diff < 3600)   { $m = (int)($diff / 60);   return $m . ' min' . ($m === 1 ? '' : 's') . ' ago'; }
+    if ($diff < 86400)  { $h = (int)($diff / 3600); return $h . ' hour' . ($h === 1 ? '' : 's') . ' ago'; }
+    if ($diff < 2592000){ $d = (int)($diff / 86400);return $d . ' day' . ($d === 1 ? '' : 's') . ' ago'; }
+    return date('M j, Y', $ts);
+}
+
+/** Turnaround time between two timestamps, e.g. "4 hrs" / "2.3 days" — used
+ *  to show how long a request took from submission to decision/issue. */
+function elapsed_between($start, $end): string {
+    if (!$start || !$end) return '';
+    $s = strtotime((string)$start); $e2 = strtotime((string)$end);
+    if (!$s || !$e2 || $e2 < $s) return '';
+    $diff = $e2 - $s;
+    if ($diff < 60)    return 'under a minute';
+    if ($diff < 3600)  return (int)($diff / 60) . ' min';
+    if ($diff < 86400) return round($diff / 3600, 1) . ' hrs';
+    return round($diff / 86400, 1) . ' days';
+}
+
 function setting($key, $default = '') {
     global $pdo;
     static $cache = null;

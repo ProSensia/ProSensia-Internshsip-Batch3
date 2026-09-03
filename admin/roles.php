@@ -50,7 +50,6 @@ $sections = [
         'intern/assignments.php'  => 'Assignments',
         'intern/motivation.php'   => 'Motivation & Goals',
         'intern/formc.php'        => 'Form C',
-        'intern/form_e.php'       => 'Form E',
         'intern/documents.php'    => 'Forms & Documents',
         'intern/enrollment.php'   => 'Enrollment',
         'intern/profile.php'      => 'Intern Profiles',

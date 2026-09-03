@@ -100,7 +100,7 @@ $evaluators = form_e_evaluators_for($target);
   </div>
 
 <?php elseif ($request['status'] === 'pending'): ?>
-  <div class="alert alert-info mb-0"><i class="bi bi-hourglass-split me-2"></i>Your Form E access request is pending Super Admin review.</div>
+  <div class="alert alert-info mb-0"><i class="bi bi-hourglass-split me-2"></i>Your Form E access request is pending Super Admin review. <span class="muted">(submitted <?= e(time_ago($request['requested_at'])) ?>)</span></div>
 
 <?php elseif ($request['status'] === 'rejected'): ?>
   <div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Your Form E access request was not approved.<?= $request['reviewer_note'] ? ' Reason: ' . e($request['reviewer_note']) : '' ?></div>
