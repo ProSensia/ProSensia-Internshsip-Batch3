@@ -80,6 +80,15 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
       body{padding:40px 16px;display:flex;justify-content:center}
       .doc-wrap{max-width:640px;width:100%}
       .print-bar{max-width:640px;margin:0 auto 16px;display:flex;gap:10px;justify-content:flex-end}
+      /* html2canvas (used for the PNG export below) can't render
+         background-clip:text or a mask-image, and mis-measures the oversized
+         200%-tall .cert-shine overlay — all three are what caused the broken
+         export (solid bar instead of the heading, wrong canvas size). These
+         overrides apply ONLY for the instant of capture (see the JS below,
+         which adds/removes .capturing right around the html2canvas call) —
+         the on-screen card you're looking at right now is untouched. */
+      .cert.capturing::after, .cert.capturing .cert-shine { display:none !important; }
+      .cert.capturing h2 { background:none !important; -webkit-background-clip:initial !important; background-clip:initial !important; color:#f0d78c !important; }
     </style>
     </head>
     <body>
@@ -93,13 +102,21 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
       document.getElementById('dlPngBtn').addEventListener('click', function () {
         var btn = this, original = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = 'Generating…';
-        html2canvas(document.querySelector('.cert'), { backgroundColor: '#0e1118', scale: 2, useCORS: true }).then(function (canvas) {
+        var cert = document.querySelector('.cert');
+        var rect = cert.getBoundingClientRect();
+        cert.classList.add('capturing');
+        html2canvas(cert, {
+          backgroundColor: '#0e1118', scale: 2, useCORS: true,
+          width: Math.ceil(rect.width), height: Math.ceil(rect.height),
+        }).then(function (canvas) {
+          cert.classList.remove('capturing');
           var a = document.createElement('a');
           a.download = <?= json_encode($title) ?> + '.png';
           a.href = canvas.toDataURL('image/png');
           document.body.appendChild(a); a.click(); a.remove();
           btn.disabled = false; btn.innerHTML = original;
         }).catch(function (err) {
+          cert.classList.remove('capturing');
           alert('Could not generate the PNG: ' + err);
           btn.disabled = false; btn.innerHTML = original;
         });
