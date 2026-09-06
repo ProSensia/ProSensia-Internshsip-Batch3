@@ -146,7 +146,14 @@ a:hover{color:var(--primary)}
 
 /* Certificate */
 /* ===== Certificates / Experience Letters — futuristic dark + gold ===== */
+/* max-width + centering is deliberate: .cert has no width of its own, so on
+   a wide screen it used to stretch across the whole .content area (up to
+   1400px) in the portal while the download page capped it at 640px — same
+   padding/font sizes, wildly different proportions between the two. Fixing
+   the width here makes every place .cert is used (portal list, download
+   page, wherever else) render at the identical size. */
 .cert{
+  max-width:640px;margin:0 auto;
   padding:36px 30px;border-radius:20px;position:relative;overflow:hidden;
   background:linear-gradient(150deg,#0a0c12,#151a26 55%,#0d1420);
   border:1px solid rgba(212,168,76,.35);
