@@ -353,12 +353,25 @@ if ($role === 'intern') {
     $myLinkedin = (string)($lq->fetchColumn() ?: '');
 }
 
+// Pagination — a page with dozens of issued certificates was rendering
+// every single one's full styled card inline (see the loop below, which no
+// longer does that for exactly this reason) and could still grow unbounded
+// over time, so cap it and page through the rest instead of ever-growing
+// one screen.
+$perPage = 50;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$offset = ($page - 1) * $perPage;
+
 if ($role==='intern') {
-    $my = $pdo->prepare('SELECT c.*, u.name FROM certificate_requests c JOIN users u ON u.id=c.user_id WHERE user_id=? ORDER BY id DESC');
+    $cnt = $pdo->prepare('SELECT COUNT(*) FROM certificate_requests WHERE user_id=?'); $cnt->execute([$uid]);
+    $totalItems = (int)$cnt->fetchColumn();
+    $my = $pdo->prepare("SELECT c.*, u.name FROM certificate_requests c JOIN users u ON u.id=c.user_id WHERE user_id=? ORDER BY id DESC LIMIT $perPage OFFSET $offset");
     $my->execute([$uid]); $items = $my->fetchAll();
 } else {
-    $items = $pdo->query('SELECT c.*, u.name FROM certificate_requests c JOIN users u ON u.id=c.user_id ORDER BY c.requested_at DESC')->fetchAll();
+    $items = $pdo->query("SELECT c.*, u.name FROM certificate_requests c JOIN users u ON u.id=c.user_id ORDER BY c.requested_at DESC LIMIT $perPage OFFSET $offset")->fetchAll();
+    $totalItems = (int)$pdo->query('SELECT COUNT(*) FROM certificate_requests')->fetchColumn();
 }
+$totalPages = max(1, (int)ceil($totalItems / $perPage));
 ?>
 <div class="d-flex justify-content-between align-items-end mb-4">
   <div>
@@ -465,7 +478,7 @@ if ($issued): foreach($issued as $c):
         // language than the dark portal), so it isn't embedded inline here —
         // just a summary tile pointing at the real thing via ?view=doc.
 ?>
-  <div class="glass card-pad mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+  <div class="glass card-pad mb-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
     <div class="d-flex align-items-center gap-3">
       <i class="bi bi-envelope-paper-fill" style="font-size:28px;color:var(--primary)"></i>
       <div>
@@ -478,10 +491,21 @@ if ($issued): foreach($issued as $c):
     </a>
   </div>
 <?php else: ?>
-  <?php render_certificate_card($c, $verifyUrl, false); ?>
-  <div class="text-center mb-4" style="margin-top:-18px">
+  <!-- Lightweight tile, not the full styled card — a page listing many
+       issued certificates was rendering every single one's gradients,
+       corner brackets, and a separate external QR image fetch inline,
+       which is real weight per row. The full card only renders one at a
+       time now, on the dedicated ?view=doc page, same as the letter. -->
+  <div class="glass card-pad mb-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-award-fill" style="font-size:28px;color:var(--primary)"></i>
+      <div>
+        <div style="font-weight:700">Certificate — <?= e($c['name']) ?></div>
+        <div class="muted" style="font-size:12px"><?= e($c['track']) ?> · <?= e($c['batch']) ?> · Issued <?= e(date('M j, Y', strtotime($c['issued_at']))) ?></div>
+      </div>
+    </div>
     <a class="btn btn-primary btn-sm" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id']) ?>" target="_blank">
-      <i class="bi bi-image me-1"></i>Download Certificate (PNG)
+      <i class="bi bi-image me-1"></i>View / Download Certificate
     </a>
   </div>
 <?php endif; endforeach; endif; ?>
@@ -561,5 +585,15 @@ if ($issued): foreach($issued as $c):
     </div>
   <?php endforeach; ?>
 </div>
+
+<?php if ($totalPages > 1): ?>
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <span class="muted" style="font-size:12.5px">Page <?= $page ?> of <?= $totalPages ?> · <?= $totalItems ?> total</span>
+  <div class="d-flex gap-2">
+    <?php if ($page > 1): ?><a class="btn btn-outline-light btn-sm" href="?page=<?= $page - 1 ?>"><i class="bi bi-arrow-left me-1"></i>Newer</a><?php endif; ?>
+    <?php if ($page < $totalPages): ?><a class="btn btn-outline-light btn-sm" href="?page=<?= $page + 1 ?>">Older<i class="bi bi-arrow-right ms-1"></i></a><?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php require __DIR__ . '/../includes/footer.php'; ?>
