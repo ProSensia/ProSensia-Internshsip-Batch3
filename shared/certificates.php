@@ -3,10 +3,17 @@ require_once __DIR__ . '/../includes/security.php';
 
 /** The certificate/experience-letter card markup — shared by the in-portal
  *  list view and the standalone print/download view below, so both always
- *  look identical. */
-function render_certificate_card(array $c, string $verifyUrl, bool $isLetter): void {
+ *  look identical. $ratio picks the aspect ratio / layout: '169' (default)
+ *  is a landscape 16:9 card — like a shareable social graphic — with the
+ *  text beside the seal and the meta row beside the QR so it actually fits
+ *  a short wide frame; '11' (square, Instagram feed) and '45' (portrait,
+ *  Instagram feed) reuse the original stacked layout, just height-capped to
+ *  the given ratio. The markup is identical across ratios — only the CSS
+ *  (see .cert-r169/.cert-r11/.cert-r45 in style.css) repositions it. */
+function render_certificate_card(array $c, string $verifyUrl, bool $isLetter, string $ratio = '169'): void {
+    $ratioClass = in_array($ratio, ['169','11','45'], true) ? 'cert-r' . $ratio : 'cert-r169';
     ?>
-    <div class="cert mb-4">
+    <div class="cert mb-4 <?= $ratioClass ?>">
       <span class="cert-corner tl"></span><span class="cert-corner tr"></span>
       <span class="cert-corner bl"></span><span class="cert-corner br"></span>
       <div class="cert-shine"></div>
@@ -14,29 +21,35 @@ function render_certificate_card(array $c, string $verifyUrl, bool $isLetter): v
         <img src="<?= logo_url() ?>" alt="ProSensia">
         <span class="cert-tag">Official Document</span>
       </div>
-      <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
-      <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
-      <p class="text-center muted">This is to certify that</p>
-      <div class="recipient"><?= e($c['name']) ?></div>
-      <?php if ($isLetter): ?>
-        <p class="text-center muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
-        <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-        <p class="text-center" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
-      <?php else: ?>
-        <p class="text-center muted">has successfully completed the</p>
-        <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-        <?php if ($c['mentor_rating']): ?><p class="text-center" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
-      <?php endif; ?>
-      <div class="meta">
-        <div>Doc ID · <b><?= e($c['serial']) ?></b></div>
-        <div>Issued · <b><?= e(date('M j, Y', strtotime($c['issued_at']))) ?></b></div>
-        <?php if (!$isLetter): ?><div>Grade · <b><?= e($c['final_grade']) ?></b></div><?php endif; ?>
-      </div>
-      <div class="text-center mt-3">
-        <div class="cert-qr-wrap">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=112x112&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px;display:block">
+      <div class="cert-body-row">
+        <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
+        <div class="cert-text-col">
+          <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
+          <p class="cert-line muted">This is to certify that</p>
+          <div class="recipient"><?= e($c['name']) ?></div>
+          <?php if ($isLetter): ?>
+            <p class="cert-line muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
+            <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+            <p class="cert-line" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
+          <?php else: ?>
+            <p class="cert-line muted">has successfully completed the</p>
+            <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+            <?php if ($c['mentor_rating']): ?><p class="cert-line" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
+          <?php endif; ?>
         </div>
-        <div class="small-cap mt-2">Scan to verify · ProSensia Document Registry</div>
+      </div>
+      <div class="cert-footer-row">
+        <div class="meta">
+          <div>Doc ID · <b><?= e($c['serial']) ?></b></div>
+          <div>Issued · <b><?= e(date('M j, Y', strtotime($c['issued_at']))) ?></b></div>
+          <?php if (!$isLetter): ?><div>Grade · <b><?= e($c['final_grade']) ?></b></div><?php endif; ?>
+        </div>
+        <div class="cert-qr-col">
+          <div class="cert-qr-wrap">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=112x112&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px;display:block">
+          </div>
+          <div class="small-cap mt-2">Scan to verify · ProSensia Document Registry</div>
+        </div>
       </div>
     </div>
     <?php
@@ -64,7 +77,9 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
         exit;
     }
 
-    $title = 'Certificate_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $c['name']);
+    $ratio = in_array($_GET['ratio'] ?? '', ['169','11','45'], true) ? $_GET['ratio'] : '169';
+    $ratioLabels = ['169' => '16:9 Landscape', '11' => '1:1 Square (Instagram)', '45' => '4:5 Portrait (Instagram)'];
+    $title = 'Certificate_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $c['name']) . '_' . $ratio;
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -78,8 +93,11 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
       body{padding:40px 16px;display:flex;justify-content:center}
-      .doc-wrap{max-width:640px;width:100%}
-      .print-bar{max-width:640px;margin:0 auto 16px;display:flex;gap:10px;justify-content:flex-end}
+      .doc-wrap{max-width:960px;width:100%}
+      .print-bar{max-width:960px;margin:0 auto 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+      .ratio-pick{display:flex;gap:6px;flex-wrap:wrap}
+      .ratio-pick a{font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid rgba(212,168,76,.3);color:#e7e9ee;text-decoration:none}
+      .ratio-pick a.active{background:#d4a84c;color:#0b0d12;font-weight:700;border-color:#d4a84c}
       /* html2canvas (used for the PNG export below) can't render
          background-clip:text or a mask-image, and mis-measures the oversized
          200%-tall .cert-shine overlay — all three are what caused the broken
@@ -94,9 +112,14 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
     <body>
       <div class="doc-wrap">
         <div class="print-bar">
+          <div class="ratio-pick">
+            <?php foreach ($ratioLabels as $rKey => $rLabel): ?>
+            <a class="<?= $rKey === $ratio ? 'active' : '' ?>" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id'] . '&ratio=' . $rKey) ?>"><?= e($rLabel) ?></a>
+            <?php endforeach; ?>
+          </div>
           <button class="btn btn-primary btn-sm" id="dlPngBtn"><i class="bi bi-image me-1"></i>Download PNG</button>
         </div>
-        <?php render_certificate_card($c, $verifyUrl, false); ?>
+        <?php render_certificate_card($c, $verifyUrl, false, $ratio); ?>
       </div>
       <script>
       document.getElementById('dlPngBtn').addEventListener('click', function () {

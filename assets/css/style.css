@@ -146,15 +146,12 @@ a:hover{color:var(--primary)}
 
 /* Certificate */
 /* ===== Certificates / Experience Letters — futuristic dark + gold ===== */
-/* max-width + centering is deliberate: .cert has no width of its own, so on
-   a wide screen it used to stretch across the whole .content area (up to
-   1400px) in the portal while the download page capped it at 640px — same
-   padding/font sizes, wildly different proportions between the two. Fixing
-   the width here makes every place .cert is used (portal list, download
-   page, wherever else) render at the identical size. */
+/* Base look shared by every ratio. Sizing/layout (width, aspect-ratio,
+   row vs stacked arrangement) lives entirely in the .cert-r169/.cert-r11/
+   .cert-r45 blocks below — .cert itself has no width of its own on purpose,
+   so it never drifts between the three variants. */
 .cert{
-  max-width:640px;margin:0 auto;
-  padding:36px 30px;border-radius:20px;position:relative;overflow:hidden;
+  margin:0 auto;position:relative;overflow:hidden;border-radius:20px;
   background:linear-gradient(150deg,#0a0c12,#151a26 55%,#0d1420);
   border:1px solid rgba(212,168,76,.35);
   box-shadow:0 0 0 1px rgba(212,168,76,.06) inset,0 24px 60px -24px rgba(0,0,0,.65);
@@ -181,25 +178,69 @@ a:hover{color:var(--primary)}
   animation:certShine 7s ease-in-out infinite;
 }
 @keyframes certShine{0%{transform:translateX(-40%) rotate(10deg)}100%{transform:translateX(430%) rotate(10deg)}}
-.cert-top{display:flex;align-items:center;justify-content:center;gap:10px;position:relative;z-index:1;margin-bottom:4px}
+.cert-top{display:flex;align-items:center;justify-content:center;gap:10px;position:relative;z-index:1}
 .cert-top img{height:26px;width:auto;filter:drop-shadow(0 0 10px rgba(212,168,76,.4))}
 .cert-tag{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--primary-glow);opacity:.8;border:1px solid rgba(212,168,76,.3);padding:3px 10px;border-radius:20px}
-.cert .seal{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;margin:14px auto 6px;position:relative;z-index:1;
+.cert .seal{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;margin:0 auto;position:relative;z-index:1;flex-shrink:0;
   background:radial-gradient(circle at 32% 30%,rgba(240,215,140,.22),rgba(212,168,76,.05));
   border:1px solid rgba(212,168,76,.4);box-shadow:0 0 26px rgba(212,168,76,.28),inset 0 0 14px rgba(212,168,76,.15);
 }
 .cert .seal img{width:40px;height:auto;filter:drop-shadow(0 0 6px rgba(212,168,76,.3))}
-.cert h2{font-size:30px;text-align:center;margin:10px 0 2px;position:relative;z-index:1;
+.cert h2{font-size:26px;text-align:center;margin:10px 0 2px;position:relative;z-index:1;
   background:linear-gradient(135deg,#fff,var(--primary-glow));-webkit-background-clip:text;background-clip:text;color:transparent}
-@media(min-width:768px){.cert h2{font-size:34px}}
-.cert .recipient{font-size:24px;text-align:center;color:var(--primary-glow);margin:14px 0;font-family:'Cormorant Garamond',serif;position:relative;z-index:1;text-shadow:0 0 22px rgba(240,215,140,.25)}
-@media(min-width:768px){.cert .recipient{font-size:28px}}
-.cert .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:26px;padding-top:16px;border-top:1px dashed rgba(212,168,76,.25);
-  font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;position:relative;z-index:1;
+.cert .cert-line{text-align:center;position:relative;z-index:1;margin:0 0 6px}
+.cert .recipient{font-size:22px;text-align:center;color:var(--primary-glow);margin:10px 0;font-family:'Cormorant Garamond',serif;position:relative;z-index:1;text-shadow:0 0 22px rgba(240,215,140,.25)}
+.cert .meta{display:flex;flex-wrap:wrap;gap:10px;
+  font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;position:relative;z-index:1;
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .cert .meta b{color:var(--primary-glow);font-weight:600}
-.cert-qr-wrap{display:inline-block;padding:10px;border-radius:14px;position:relative;z-index:1;
+.cert-qr-wrap{display:inline-block;padding:8px;border-radius:14px;position:relative;z-index:1;
   background:rgba(212,168,76,.05);border:1px solid rgba(212,168,76,.25);box-shadow:0 0 22px rgba(212,168,76,.12)}
+.cert-qr-col{position:relative;z-index:1;text-align:center;flex-shrink:0}
+.cert-body-row{position:relative;z-index:1}
+.cert-footer-row{position:relative;z-index:1}
+
+/* ---- 16:9 landscape (default) — like a shareable social graphic: text
+   sits beside the seal, meta sits beside the QR, so the whole thing fits a
+   short wide frame instead of needing the full stacked height. ---- */
+.cert.cert-r169{
+  width:100%;max-width:920px;aspect-ratio:16/9;
+  padding:26px 40px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.cert-r169 .cert-body-row{display:flex;flex-direction:row-reverse;align-items:center;gap:28px;flex:1;min-height:0}
+.cert-r169 .cert-text-col{flex:1;min-width:0}
+.cert-r169 .cert-text-col h2{text-align:left;font-size:22px;margin:0 0 4px}
+.cert-r169 .cert-text-col .cert-line{text-align:left;font-size:13px;margin:0 0 4px}
+.cert-r169 .cert-text-col .recipient{text-align:left;font-size:21px;margin:4px 0}
+.cert-r169 .seal{margin:0;width:64px;height:64px}
+.cert-r169 .seal img{width:32px}
+.cert-r169 .cert-footer-row{display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:20px;
+  border-top:1px dashed rgba(212,168,76,.25);padding-top:12px}
+.cert-r169 .meta{flex-direction:column;align-items:flex-start;gap:4px}
+.cert-r169 .cert-qr-wrap img{width:66px;height:66px}
+.cert-r169 .small-cap{font-size:8px}
+
+/* ---- Square (1:1) / Portrait (4:5) — Instagram feed sizes. Same stacked
+   layout the card always used, just height-capped to the chosen ratio. ---- */
+.cert.cert-r11, .cert.cert-r45{
+  width:100%;max-width:640px;padding:30px 28px;
+  display:flex;flex-direction:column;
+}
+.cert.cert-r11{aspect-ratio:1/1}
+.cert.cert-r45{aspect-ratio:4/5}
+.cert-r11 .cert-top, .cert-r45 .cert-top{margin-bottom:2px}
+.cert-r11 .seal, .cert-r45 .seal{margin:10px auto 4px}
+.cert-r11 .recipient, .cert-r45 .recipient{margin:8px 0}
+.cert-r11 .cert-footer-row, .cert-r45 .cert-footer-row{margin-top:auto;padding-top:14px;border-top:1px dashed rgba(212,168,76,.25)}
+.cert-r11 .meta, .cert-r45 .meta{justify-content:space-between;margin-bottom:12px}
+.cert-r11 .cert-qr-wrap img, .cert-r45 .cert-qr-wrap img{width:100px;height:100px}
+@media(min-width:500px){
+  .cert.cert-r169{padding:32px 48px}
+  .cert-r169 .cert-text-col h2{font-size:26px}
+  .cert-r169 .cert-text-col .recipient{font-size:25px}
+  .cert.cert-r11 h2, .cert.cert-r45 h2{font-size:30px}
+  .cert.cert-r11 .recipient, .cert.cert-r45 .recipient{font-size:26px}
+}
 
 /* ============ Signup wizard ============ */
 .wizard{max-width:680px;margin:0 auto}
