@@ -176,6 +176,7 @@ function _default_perms(): array {
         'mentor/form_e_evaluate.php'   => ['mentor','super_admin'],
         'admin/form_e_eligibility.php' => ['super_admin','management'],
         'admin/form_e_preview_sample.php' => ['super_admin','management'],
+        'admin/experience_letter_preview_sample.php' => ['super_admin','management'],
         'admin/form_e_review.php'      => ['super_admin','management'],
         'admin/documents.php'          => ['super_admin','management'],
         'shared/materials.php'         => ['intern','super_admin','mentor','management'],

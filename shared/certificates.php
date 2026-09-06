@@ -286,11 +286,16 @@ if ($role==='intern') {
     <h1 class="serif" style="font-size:38px;margin:0">Certificates &amp; Experience Letters</h1>
     <p class="muted mb-0">Issued after Enrollment + Form C are approved.</p>
   </div>
-  <?php if ($role==='intern'): ?>
+  <div class="d-flex gap-2 flex-wrap">
+    <?php if (is_admin_role($role)): ?>
+    <a class="btn btn-outline-light" href="<?= base_url('admin/experience_letter_preview_sample.php') ?>" target="_blank"><i class="bi bi-eye me-1"></i>Preview sample Experience Letter</a>
+    <?php endif; ?>
+    <?php if ($role==='intern'): ?>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reqDocModal"><i class="bi bi-award me-1"></i>Request document</button>
-  <?php elseif ($role==='founder'): ?>
+    <?php elseif ($role==='founder'): ?>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#directIssueModal"><i class="bi bi-lightning-charge-fill me-1"></i>Issue directly to a student</button>
-  <?php endif; ?>
+    <?php endif; ?>
+  </div>
 </div>
 
 <?php if ($role==='intern'): ?>

@@ -1,18 +1,25 @@
 <?php
 // shared/experience_letter_template.php — single source of truth for the
-// Experience Letter document. Reproduces the org's actual letterhead
-// (ExperienceLetter/HiraMalik.pdf — a real previously-issued letter used
-// here purely as the visual reference, not as a data source): white
-// background, ProSensia letterhead + address, the same gold diagonal corner
-// motif (built with CSS so it scales/prints cleanly rather than needing a
-// traced image), the same body structure, and the same footer contact row.
+// Experience Letter document.
+//
+// This uses the org's ACTUAL letterhead artwork, not a CSS recreation: the
+// header (logo, tagline, address), both gold diagonal corner shapes, and the
+// footer contact-icons row all come from assets/img/experience-letter-bg.png
+// — extracted directly from ExperienceLetter/HiraMalik.docx (the org's real,
+// previously-issued letter, kept in the repo purely as the design reference).
+// That docx anchors this exact image as a single full-page background layer
+// behind the text, so reusing the same asset the same way guarantees the
+// header/footer are pixel-identical to the real letterhead rather than an
+// approximation. Only the text content in the middle (date, body, QR) is
+// rendered dynamically and overlaid on top.
 //
 // The one deliberate content change from the reference: the hand signature +
-// company stamp graphic is replaced with a QR code once the Founder & CEO
-// has approved the request — same "no physical signature needed, it's
-// digitally verified" model used for Form E, and for the same reason (a
-// scanned signature image can be copy-pasted onto a fake letter; a live
-// server-side verification check can't).
+// company stamp graphic (also extracted from that docx, but NOT reused here)
+// is replaced with a QR code once the Founder & CEO has issued the letter —
+// same "no physical signature needed, it's digitally verified" model used
+// for Form E, and for the same reason (a scanned signature image can be
+// copy-pasted onto a fake letter; a live server-side verification check
+// can't).
 require_once __DIR__ . '/../includes/auth.php';
 
 function render_experience_letter_document(array $d, string $mode = 'final'): void {
@@ -35,55 +42,47 @@ function render_experience_letter_document(array $d, string $mode = 'final'): vo
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
-  body{background:#e9e9e9;margin:0;padding:30px 12px;font-family:'Inter',Arial,sans-serif;color:#1a1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .el-page{max-width:800px;margin:0 auto;background:#fff;position:relative;overflow:hidden;padding:46px 56px 40px;box-shadow:0 10px 40px rgba(0,0,0,.15);min-height:1050px}
-  @media print{ body{background:#fff;padding:0} .el-page{box-shadow:none;margin:0;max-width:100%} }
-  .el-corner-tr{position:absolute;top:0;right:0;width:340px;height:200px;z-index:0;
-    background:linear-gradient(135deg,#f0d78c,#d4a84c);
-    clip-path:polygon(38% 0,100% 0,100% 100%,78% 100%);}
-  .el-corner-tr::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,#fff2,transparent 55%)}
-  .el-corner-bl{position:absolute;bottom:0;left:0;width:100%;height:120px;z-index:0;
-    background:linear-gradient(115deg,#d4a84c,#f0d78c 60%,#d4a84c);
-    clip-path:polygon(0 35%,55% 100%,0 100%);}
-  .el-body{position:relative;z-index:1}
-  .el-watermark{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);
-    font-size:52px;font-weight:800;color:rgba(212,168,76,.22);white-space:nowrap;z-index:2;pointer-events:none;letter-spacing:2px}
-  .el-header img{height:64px}
-  .el-tagline{font-weight:800;font-size:20px;margin-top:2px}
-  .el-address{font-weight:700;font-size:12px;color:#5b4a1f;margin-top:2px}
-  .el-date{text-align:right;font-weight:700;font-size:13.5px;margin-top:22px}
-  .el-title{text-align:center;font-weight:800;font-size:17px;letter-spacing:.02em;margin:22px 0 14px}
-  .el-subtitle{font-weight:800;font-size:14px;margin-bottom:10px}
-  .el-p{font-size:13.5px;line-height:1.7;margin:0 0 14px;text-align:justify}
-  .el-verify-line{font-size:13.5px;margin:6px 0 22px}
+  @page{ size:A4; margin:0; }
+  body{background:#c7c7c7;margin:0;padding:24px 12px;font-family:'Inter',Arial,sans-serif;color:#1a1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* The page is sized to the exact aspect ratio of experience-letter-bg.png
+     (1414x2000, ~A4) and the image is stretched 100% to fill it exactly —
+     no cropping, no letterboxing, so the header/footer land pixel-true. */
+  .el-page{max-width:820px;margin:0 auto;aspect-ratio:1414/2000;position:relative;overflow:hidden;
+    background-image:url('<?= base_url('assets/img/experience-letter-bg.png') ?>');background-size:100% 100%;background-repeat:no-repeat;
+    box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  @media print{ body{background:#fff;padding:0} .el-page{box-shadow:none;margin:0;max-width:none;width:100%} }
+  .el-watermark{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);
+    font-size:52px;font-weight:800;color:rgba(180,60,40,.16);white-space:nowrap;z-index:2;pointer-events:none;letter-spacing:2px}
+  /* Content sits in the empty band the letterhead artwork already reserves
+     between the header block (top) and the footer icon row (bottom). Fixed
+     px sizes are calibrated for .el-page's 820px design width — deliberate,
+     not vw, since vw tracks the viewport rather than this capped container
+     and would render oversized on any screen wider than 820px. */
+  .el-content{position:absolute;top:23%;left:9.5%;right:8%;bottom:11%;z-index:1;display:flex;flex-direction:column}
+  .el-date{text-align:right;font-weight:700;font-size:13.5px;margin-bottom:16px}
+  .el-title{text-align:center;font-weight:800;font-size:16.5px;letter-spacing:.02em;margin-bottom:12px}
+  .el-subtitle{font-weight:800;font-size:14px;margin-bottom:9px}
+  .el-p{font-size:13px;line-height:1.65;margin:0 0 12px;text-align:justify}
+  .el-verify-line{font-size:13px;margin:3px 0 16px}
   .el-verify-line a{color:#1a56db}
-  .el-org{font-weight:800;font-size:13.5px;margin-bottom:10px}
-  .el-sign-row{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-top:8px;min-height:96px}
-  .el-verified-badge{display:flex;align-items:center;gap:14px}
-  .el-verified-badge img{width:78px;height:78px;border-radius:10px;border:1px solid #eee}
-  .el-verified-text b{color:#0a7a2f;font-size:13.5px;display:block}
-  .el-verified-text span{font-size:11.5px;color:#555;display:block;margin-top:2px}
+  .el-org{font-weight:800;font-size:13px;margin-bottom:8px}
+  .el-sign-row{display:flex;align-items:center;gap:14px;margin-top:auto}
+  .el-verified-badge{display:flex;align-items:center;gap:12px}
+  .el-verified-badge img{width:78px;height:78px;border-radius:8px;border:1px solid #eee}
+  .el-verified-text b{color:#0a7a2f;font-size:12.5px;display:block}
+  .el-verified-text span{font-size:11px;color:#555;display:block;margin-top:2px}
   .el-pending-note{font-size:12px;color:#b45309;font-style:italic}
-  .el-footer{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:18px;justify-content:center;margin-top:34px;padding-top:14px;font-size:11.5px;color:#333}
-  .el-footer span{display:flex;align-items:center;gap:6px}
-  .el-toolbar{max-width:800px;margin:0 auto 14px;display:flex;justify-content:flex-end}
+  .el-toolbar{max-width:820px;margin:0 auto 14px;display:flex;justify-content:flex-end}
   .el-toolbar button{background:#d4a84c;color:#1a1a1a;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer}
-  @media print{ .el-toolbar{display:none} body{background:#fff} }
+  @media print{ .el-toolbar{display:none} }
 </style>
 </head>
 <body>
 <div class="el-toolbar"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
 <div class="el-page">
   <?php if ($watermark): ?><div class="el-watermark"><?= e($watermark) ?></div><?php endif; ?>
-  <div class="el-corner-tr"></div>
 
-  <div class="el-body">
-    <div class="el-header">
-      <img src="<?= base_url('assets/img/prosensia-logo-black.png') ?>" alt="ProSensia">
-      <div class="el-tagline">SMC-Private Limited</div>
-      <div class="el-address">Building C-2, PAF-IAST, Mang, Haripur, KPK, Pakistan</div>
-    </div>
-
+  <div class="el-content">
     <div class="el-date"><?= e(date('F j, Y', $d['issued_at'] ? strtotime($d['issued_at']) : time())) ?></div>
 
     <div class="el-title">TO WHOM IT MAY CONCERN</div>
@@ -104,7 +103,7 @@ function render_experience_letter_document(array $d, string $mode = 'final'): vo
     <div class="el-sign-row">
       <?php if ($founderVerified && $verifyUrl): ?>
       <div class="el-verified-badge">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=<?= urlencode($verifyUrl) ?>" alt="Verify QR">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?= urlencode($verifyUrl) ?>" alt="Verify QR">
         <div class="el-verified-text">
           <b>&#10003; Digitally Verified — No Signature Required</b>
           <span>Approved by <?= e($d['founder_approved_by_name']) ?>, Founder &amp; CEO</span>
@@ -115,14 +114,6 @@ function render_experience_letter_document(array $d, string $mode = 'final'): vo
       <div class="el-pending-note">Awaiting final approval — the verification QR will appear here once approved.</div>
       <?php endif; ?>
     </div>
-  </div>
-
-  <div class="el-corner-bl"></div>
-  <div class="el-footer">
-    <span>@<?= e(setting('org_social_handle','prosensia')) ?></span>
-    <span><?= e(setting('org_website','www.prosensia.pk')) ?></span>
-    <span><?= e(setting('org_contact_email','prosensia@gmail.com')) ?></span>
-    <span><?= e(setting('org_contact_phone','+92 310 7717890')) ?></span>
   </div>
 </div>
 </body>
