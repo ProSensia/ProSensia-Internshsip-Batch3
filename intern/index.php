@@ -54,7 +54,7 @@ try { $un=$pdo->prepare('SELECT COUNT(*) FROM notifications WHERE to_user_id=? A
 ?>
 
 <?php if (!$todayAtt): ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/characters.css') ?>">
+<link rel="stylesheet" href="<?= asset_url('assets/css/characters.css') ?>">
 <div class="checkin-overlay" id="dash-checkin-overlay">
   <div class="checkin-card">
     <?php
@@ -105,7 +105,7 @@ try { $un=$pdo->prepare('SELECT COUNT(*) FROM notifications WHERE to_user_id=? A
     </form>
   </div>
 </div>
-<script src="<?= base_url('assets/js/characters.js') ?>"></script>
+<script src="<?= asset_url('assets/js/characters.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const eng = new CharEngine(<?= json_encode($ckey2) ?>);
@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </div>
 
-<link rel="stylesheet" href="<?= base_url('assets/css/characters.css') ?>">
+<link rel="stylesheet" href="<?= asset_url('assets/css/characters.css') ?>">
 <script>
 // Live activity feed via Server-Sent Events
 (function() {

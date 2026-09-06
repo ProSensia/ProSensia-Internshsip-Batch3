@@ -476,7 +476,7 @@ if ($role === 'intern') {
 ═══════════════════════════════════════════════════ */ ?>
 <?php if ($role === 'intern'): ?>
 
-<link rel="stylesheet" href="<?= base_url('assets/css/characters.css') ?>">
+<link rel="stylesheet" href="<?= asset_url('assets/css/characters.css') ?>">
 
 <?php
 $char_cls = $char_key === 'ac' ? 'char-buzz-wrap' : 'char-gigi-wrap';
@@ -764,7 +764,7 @@ const PS_URLS        = {
   leaderboard:<?= json_encode(base_url('intern/leaderboard.php')) ?>,
 };
 </script>
-<script src="<?= base_url('assets/js/characters.js') ?>"></script>
+<script src="<?= asset_url('assets/js/characters.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
   const eng = new CharEngine(PS_CHAR);

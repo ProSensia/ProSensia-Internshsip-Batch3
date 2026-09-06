@@ -37,6 +37,22 @@ function base_url($path = '') {
     return $scriptDir . ltrim($path, '/');
 }
 
+/** Cache-busted static asset URL — appends the file's own last-modified
+ *  time as ?v=, so browsers can cache it aggressively (nothing expires it
+ *  early) but the URL itself changes automatically the moment the file on
+ *  disk changes (a deploy, an edit), forcing a fresh fetch instead of the
+ *  stale cached copy. Use this for style.css/characters.css/characters.js
+ *  instead of base_url() directly — a bare base_url() URL never changes,
+ *  so once a browser caches it there's nothing to make it ask again; a
+ *  time()-based ?v= (the old approach in a couple of places) busts the
+ *  cache on literally every request instead, which just defeats caching
+ *  rather than doing real version control. */
+function asset_url($path) {
+    $abs = __DIR__ . '/../' . ltrim($path, '/');
+    $v = @filemtime($abs);
+    return base_url($path) . '?v=' . ($v ?: '1');
+}
+
 function role_home($role) {
     return [
       'founder'     => base_url('admin/index.php'),
