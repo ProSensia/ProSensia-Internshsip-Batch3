@@ -39,5 +39,9 @@ render_form_e_document([
     'founder_approved_at'      => date('Y-m-d H:i:s'),
     'doc_uid'    => 'FE-SAMPLE-PREVIEW',
     'issued_at'  => date('Y-m-d H:i:s'),
-    'verify_url' => base_url('verify_document.php') . '?d=SAMPLE&t=SAMPLE',
+    // base_url() only returns a site-relative path (no scheme/host), which a
+    // phone's QR scanner can't resolve to anywhere — doc_verify_url() builds
+    // the actual absolute URL (same helper the real issued-document flow
+    // uses), so the sample QR opens exactly like a real one would.
+    'verify_url' => doc_verify_url('FE-SAMPLE-PREVIEW', 'sample-preview-token'),
 ], 'preview');
