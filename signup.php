@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $skills=trim($_POST['skills']??''); $bio=trim($_POST['bio']??'');
   $gh=trim($_POST['github']??''); $li=trim($_POST['linkedin']??''); $pf=trim($_POST['portfolio']??'');
   $dept=trim($_POST['department']??'');
+  $batch=trim($_POST['batch']??'') ?: 'Batch 3 (Current)';
 
   // Validate avatar is present and uploaded correctly
   if (empty($_FILES['avatar']['name']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
@@ -67,12 +68,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       $pdo->prepare('INSERT INTO profiles(
         user_id, avatar_path, father_name, cnic, reg_number, semester, phone,
         city, address, university, degree, graduation_year, department, skills,
-        github, linkedin, portfolio, bio
-      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        github, linkedin, portfolio, bio, batch
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([
           $uid, $avatarPath, $father, $cnic, $reg, $sem, $phone,
           $city, $addr, $uni, $deg, $grad, $dept, $skills,
-          $gh, $li, $pf, $bio
+          $gh, $li, $pf, $bio, $batch
         ]);
       $ok = true;
     }
@@ -120,6 +121,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           <div class="col-12"><label class="form-label">Full name</label><input class="form-control" name="name" required></div>
           <div class="col-md-7"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
           <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
+          <div class="col-12">
+            <label class="form-label">Which batch are you from?</label>
+            <input class="form-control" name="batch" value="Batch 3 (Current)" placeholder="e.g. Batch 3 (Current), Batch 2, Batch 1">
+            <div class="muted" style="font-size:12px;margin-top:4px">From an earlier batch and just here for your Certificate/Experience Letter? Enter your batch and sign up anyway — Super Admin/Founder can verify and issue it once your account is approved.</div>
+          </div>
         </div>
         <div class="mt-4 d-flex justify-content-between">
           <a class="btn btn-ghost" href="<?= base_url('login.php') ?>"><i class="bi bi-arrow-left me-1"></i>Back to sign in</a>

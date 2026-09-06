@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && $is_admin) {
   header('Location: '.base_url('admin/users.php')); exit;
 }
 
-$pending = $pdo->query("SELECT u.*, p.cnic, p.phone, p.reg_number, p.university FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status='pending' ORDER BY u.created_at DESC")->fetchAll();
+$pending = $pdo->query("SELECT u.*, p.cnic, p.phone, p.reg_number, p.university, p.batch FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status='pending' ORDER BY u.created_at DESC")->fetchAll();
 $all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.semester FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.status!='pending' ORDER BY u.role,u.name")->fetchAll();
 ?>
 <?php if ($m = flash()): ?><div class="alert alert-info"><?= e($m) ?></div><?php endif; ?>
@@ -60,8 +60,10 @@ $all = $pdo->query("SELECT u.*, p.phone, p.reg_number, p.university, p.cnic, p.s
   <?php foreach($pending as $u): ?>
     <div class="py-3" style="border-top:1px solid var(--border)">
       <div class="row g-3 align-items-center">
-        <div class="col-md-5"><b><?= e($u['name']) ?></b><div class="muted" style="font-size:12px"><?= e($u['email']) ?> · <?= e($u['phone']) ?> · <?= e($u['university']) ?></div></div>
-        <div class="col-md-3 muted" style="font-size:12px">CNIC: <?= e($u['cnic']) ?><br>Reg #: <?= e($u['reg_number']) ?></div>
+        <div class="col-md-5"><b><?= e($u['name']) ?></b><div class="muted" style="font-size:12px"><?= e($u['email']) ?> · <?= e($u['phone']) ?> · <?= e($u['university']) ?></div>
+          <?php if (!empty($u['batch']) && stripos($u['batch'], 'current') === false): ?><span class="badge b-info mt-1" style="font-size:10px"><i class="bi bi-clock-history me-1"></i><?= e($u['batch']) ?> — past batch alum</span><?php endif; ?>
+        </div>
+        <div class="col-md-3 muted" style="font-size:12px">CNIC: <?= e($u['cnic']) ?><br>Reg #: <?= e($u['reg_number']) ?><?= !empty($u['batch']) ? '<br>Batch: '.e($u['batch']) : '' ?></div>
         <div class="col-md-4 d-flex gap-2 justify-content-md-end flex-wrap">
           <form method="post"><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Approve</button></form>
           <form method="post"><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>"><button class="btn btn-danger btn-sm"><i class="bi bi-x-circle me-1"></i>Reject</button></form>

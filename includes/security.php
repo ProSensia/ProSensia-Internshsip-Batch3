@@ -99,6 +99,16 @@ function certificate_content_snapshot(int $reqId): ?array {
         'final_grade'   => $c['final_grade'],
         'mentor_rating' => $c['mentor_rating'],
         'issued_at'     => $c['issued_at'],
+        // Experience Letter fields — included so an edit after issuance
+        // (e.g. changing the role title or feedback text) is detected as
+        // content drift by verify_document(), same as every other field here.
+        'pronoun'          => $c['pronoun'] ?? null,
+        'role_title'       => $c['role_title'] ?? null,
+        'work_summary'     => $c['work_summary'] ?? null,
+        'closing_feedback' => $c['closing_feedback'] ?? null,
+        'extra_note'       => $c['extra_note'] ?? null,
+        'start_date'       => $c['start_date'] ?? null,
+        'end_date'         => $c['end_date'] ?? null,
     ];
 }
 

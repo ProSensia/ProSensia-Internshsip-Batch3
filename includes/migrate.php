@@ -10,7 +10,7 @@ function col_exists(PDO $pdo, $table, $col) {
 }
 function run_silent(PDO $pdo, $sql) { try { $pdo->exec($sql); } catch (Exception $e) {} }
 
-$_SCHEMA_TARGET = 9;
+$_SCHEMA_TARGET = 10;
 $_db_ver = 0;
 try {
     $_db_ver = (int)($pdo->query("SELECT v FROM settings WHERE k='schema_ver'")->fetchColumn() ?: 0);
@@ -240,6 +240,19 @@ try {
     if (!col_exists($pdo,'form_e','founder_approved_by')) run_silent($pdo,"ALTER TABLE form_e ADD COLUMN founder_approved_by INT NULL AFTER admin_reviewed_at");
     if (!col_exists($pdo,'form_e','founder_approved_at')) run_silent($pdo,"ALTER TABLE form_e ADD COLUMN founder_approved_at TIMESTAMP NULL AFTER founder_approved_by");
 
+    // Phase 10: Experience Letter rebuilt as its own real letterhead document
+    // (distinct from the Certificate's dark card design) + direct-issue by
+    // Founder/Super Admin (no pending request required) + self-reported
+    // batch at signup for past-batch alumni requesting a verified document.
+    if (!col_exists($pdo,'certificate_requests','pronoun'))          run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN pronoun ENUM('male','female') NULL AFTER linkedin_url");
+    if (!col_exists($pdo,'certificate_requests','role_title'))       run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN role_title VARCHAR(160) NULL AFTER pronoun");
+    if (!col_exists($pdo,'certificate_requests','work_summary'))     run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN work_summary TEXT NULL AFTER role_title");
+    if (!col_exists($pdo,'certificate_requests','closing_feedback')) run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN closing_feedback TEXT NULL AFTER work_summary");
+    if (!col_exists($pdo,'certificate_requests','extra_note'))       run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN extra_note VARCHAR(255) NULL AFTER closing_feedback");
+    if (!col_exists($pdo,'certificate_requests','start_date'))       run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN start_date DATE NULL AFTER extra_note");
+    if (!col_exists($pdo,'certificate_requests','end_date'))         run_silent($pdo,"ALTER TABLE certificate_requests ADD COLUMN end_date DATE NULL AFTER start_date");
+    if (!col_exists($pdo,'profiles','batch'))                        run_silent($pdo,"ALTER TABLE profiles ADD COLUMN batch VARCHAR(60) NULL");
+
     // Stamp version so subsequent loads skip everything above
-    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','9') ON DUPLICATE KEY UPDATE v='9'");
+    run_silent($pdo,"INSERT INTO settings(k,v) VALUES('schema_ver','10') ON DUPLICATE KEY UPDATE v='10'");
 } catch (Exception $e) {}

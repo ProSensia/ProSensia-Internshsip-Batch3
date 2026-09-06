@@ -42,8 +42,9 @@ function render_certificate_card(array $c, string $verifyUrl, bool $isLetter): v
     <?php
 }
 
-// cert_verify_url_for() is defined further below in this same file — PHP
-// hoists top-level function declarations, so it's callable here too.
+// cert_verify_url_for() and experience_letter_render_data() are defined
+// further below in this same file — PHP hoists top-level function
+// declarations, so they're callable here too.
 
 // ── Raw document view (no portal chrome) — Preview → Print → Download PDF ──
 if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
@@ -56,7 +57,14 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
 
     $isLetter = $c['request_type'] === 'experience_letter';
     $verifyUrl = cert_verify_url_for($pdo, $c);
-    $title = ($isLetter ? 'ExperienceLetter_' : 'Certificate_') . preg_replace('/[^A-Za-z0-9_-]/', '_', $c['name']);
+
+    if ($isLetter) {
+        require_once __DIR__ . '/experience_letter_template.php';
+        render_experience_letter_document(experience_letter_render_data($pdo, $c, $verifyUrl), 'final');
+        exit;
+    }
+
+    $title = 'Certificate_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $c['name']);
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -79,7 +87,7 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
         <div class="print-bar">
           <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / Save as PDF</button>
         </div>
-        <?php render_certificate_card($c, $verifyUrl, $isLetter); ?>
+        <?php render_certificate_card($c, $verifyUrl, false); ?>
       </div>
     </body>
     </html>
@@ -122,15 +130,39 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     if (($_POST['action'] ?? '')==='issue' && is_admin_role($role)) {
         $id = (int)$_POST['id'];
         $serial = 'PSN-B3-'.str_pad((string)random_int(1000,9999),4,'0',STR_PAD_LEFT);
-        $pdo->prepare("UPDATE certificate_requests SET status='issued',serial=?,final_grade=?,mentor_rating=?,reviewer_note=?,issued_at=NOW(),issued_by=? WHERE id=?")
-            ->execute([$serial,$_POST['final_grade'],(int)$_POST['mentor_rating'],$_POST['note'],$uid,$id]);
+        $rtQ = $pdo->prepare('SELECT request_type FROM certificate_requests WHERE id=?'); $rtQ->execute([$id]);
+        $isLetterIssue = $rtQ->fetchColumn() === 'experience_letter';
+
+        // Server-side enforcement of the same rule the UI already hides the
+        // form for: only the Founder & CEO can issue an Experience Letter,
+        // since issuing is what attaches the verification QR.
+        if ($isLetterIssue && $role !== 'founder') {
+            flash('Only the Founder & CEO can issue an Experience Letter.');
+            header('Location: '.base_url('shared/certificates.php')); exit;
+        }
+
+        if ($isLetterIssue) {
+            $pdo->prepare("UPDATE certificate_requests SET status='issued',serial=?,reviewer_note=?,issued_at=NOW(),issued_by=?,
+                pronoun=?,role_title=?,work_summary=?,closing_feedback=?,extra_note=?,start_date=?,end_date=? WHERE id=?")
+                ->execute([
+                    $serial, $_POST['note'] ?? '', $uid,
+                    ($_POST['pronoun'] ?? '') === 'female' ? 'female' : 'male',
+                    trim($_POST['role_title'] ?? ''), trim($_POST['work_summary'] ?? ''), trim($_POST['closing_feedback'] ?? ''),
+                    trim($_POST['extra_note'] ?? ''), $_POST['start_date'] ?: null, $_POST['end_date'] ?: null,
+                    $id,
+                ]);
+        } else {
+            $pdo->prepare("UPDATE certificate_requests SET status='issued',serial=?,final_grade=?,mentor_rating=?,reviewer_note=?,issued_at=NOW(),issued_by=? WHERE id=?")
+                ->execute([$serial,$_POST['final_grade'],(int)$_POST['mentor_rating'],$_POST['note'],$uid,$id]);
+        }
+
         $rowQ = $pdo->prepare('SELECT user_id, request_type FROM certificate_requests WHERE id=?'); $rowQ->execute([$id]); $crow = $rowQ->fetch();
         if ($crow) {
             $docType = $crow['request_type'] === 'experience_letter' ? 'experience_letter' : 'certificate';
             $issued = issue_document($docType, 'certificate_requests', $id, (int)$crow['user_id'], $uid);
             log_audit($uid, $docType.'.issue', 'certificate_requests', $id, ['doc_uid' => $issued['doc_uid'] ?? null]);
         }
-        flash('Certificate issued ('.$serial.').');
+        flash(($isLetterIssue ? 'Experience Letter' : 'Certificate').' issued ('.$serial.').');
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
     if (($_POST['action'] ?? '')==='reject' && is_admin_role($role)) {
@@ -141,6 +173,45 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             ->execute([$_POST['note'],$id]);
         log_audit($uid, $rt.'.reject', 'certificate_requests', $id);
         flash('Request rejected.');
+        header('Location: '.base_url('shared/certificates.php')); exit;
+    }
+    // Founder-only: issue a Certificate/Experience Letter directly to any
+    // existing user, with no prior request/pending stage — for past-batch
+    // alumni (see the new "batch" question at signup) or anyone the Founder
+    // wants to hand a document to proactively.
+    if (($_POST['action'] ?? '')==='direct_issue' && $role === 'founder') {
+        $targetUid = (int)($_POST['target_user_id'] ?? 0);
+        $reqType = in_array($_POST['request_type'] ?? '', ['certificate','experience_letter'], true) ? $_POST['request_type'] : 'certificate';
+        $tu = $pdo->prepare('SELECT id FROM users WHERE id=?'); $tu->execute([$targetUid]);
+        if (!$tu->fetchColumn()) {
+            flash('Select a valid student.');
+        } else {
+            $track = trim($_POST['track'] ?? '') ?: 'ProSensia Internship';
+            $batch = trim($_POST['batch'] ?? '') ?: 'N/A';
+            $serial = 'PSN-B3-'.str_pad((string)random_int(1000,9999),4,'0',STR_PAD_LEFT);
+
+            if ($reqType === 'experience_letter') {
+                $pdo->prepare("INSERT INTO certificate_requests
+                    (user_id,track,batch,request_type,status,serial,reviewer_note,requested_at,issued_at,issued_by,
+                     pronoun,role_title,work_summary,closing_feedback,extra_note,start_date,end_date)
+                    VALUES(?,?,?,'experience_letter','issued',?,?,NOW(),NOW(),?,?,?,?,?,?,?,?)")
+                    ->execute([
+                        $targetUid, $track, $batch, $serial, trim($_POST['note'] ?? ''), $uid,
+                        ($_POST['pronoun'] ?? '') === 'female' ? 'female' : 'male',
+                        trim($_POST['role_title'] ?? ''), trim($_POST['work_summary'] ?? ''), trim($_POST['closing_feedback'] ?? ''),
+                        trim($_POST['extra_note'] ?? ''), $_POST['start_date'] ?: null, $_POST['end_date'] ?: null,
+                    ]);
+            } else {
+                $pdo->prepare("INSERT INTO certificate_requests
+                    (user_id,track,batch,request_type,status,serial,final_grade,mentor_rating,reviewer_note,requested_at,issued_at,issued_by)
+                    VALUES(?,?,?,'certificate','issued',?,?,?,?,NOW(),NOW(),?)")
+                    ->execute([$targetUid, $track, $batch, $serial, trim($_POST['final_grade'] ?? ''), (int)($_POST['mentor_rating'] ?? 5), trim($_POST['note'] ?? ''), $uid]);
+            }
+            $newId = (int)$pdo->lastInsertId();
+            $issued = issue_document($reqType, 'certificate_requests', $newId, $targetUid, $uid);
+            log_audit($uid, $reqType.'.direct_issue', 'certificate_requests', $newId, ['doc_uid' => $issued['doc_uid'] ?? null]);
+            flash(($reqType === 'experience_letter' ? 'Experience Letter' : 'Certificate').' issued directly ('.$serial.').');
+        }
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
 }
@@ -156,6 +227,45 @@ function cert_verify_url_for(PDO $pdo, array $item): string {
     $issuedBy = (int)($item['issued_by'] ?: $item['user_id']);
     $issued = issue_document($docType, 'certificate_requests', (int)$item['id'], (int)$item['user_id'], $issuedBy);
     return $issued['verify_url'] ?? '#';
+}
+
+/** Assembles render_experience_letter_document()'s data array from a
+ *  certificate_requests row. The QR/"digitally verified" treatment only
+ *  appears when the person who actually clicked Issue holds the Founder &
+ *  CEO role — same "he doesn't physically sign, the system attaches proof
+ *  once he verifies it" model as Form E. If a Super Admin (not Founder)
+ *  issued it, the letter shows a plain "not verified by the Founder" note
+ *  and withholds the QR — see render_experience_letter_document(). */
+function experience_letter_render_data(PDO $pdo, array $c, string $verifyUrl): array {
+    $pq = $pdo->prepare('SELECT father_name, cnic FROM profiles WHERE user_id=?');
+    $pq->execute([(int)$c['user_id']]); $profile = $pq->fetch() ?: [];
+
+    $docQ = $pdo->prepare('SELECT doc_uid FROM documents WHERE doc_type="experience_letter" AND ref_table="certificate_requests" AND ref_id=? AND status="active"');
+    $docQ->execute([(int)$c['id']]); $docUid = (string)($docQ->fetchColumn() ?: '');
+
+    $founderName = '';
+    if (!empty($c['issued_by'])) {
+        $iq = $pdo->prepare("SELECT name FROM users WHERE id=? AND role='founder'");
+        $iq->execute([(int)$c['issued_by']]);
+        $founderName = (string)($iq->fetchColumn() ?: '');
+    }
+
+    return [
+        'student_name' => $c['name'],
+        'pronoun' => $c['pronoun'] ?? 'male',
+        'father_name' => $profile['father_name'] ?? '',
+        'cnic' => $profile['cnic'] ?? '',
+        'organization' => setting('form_e_org_name', 'ProSensia (SMC-Private Limited)'),
+        'role_title' => $c['role_title'] ?: $c['track'],
+        'start_date' => $c['start_date'], 'end_date' => $c['end_date'],
+        'extra_note' => $c['extra_note'] ?? '',
+        'work_summary' => $c['work_summary'] ?? '',
+        'closing_feedback' => $c['closing_feedback'] ?? '',
+        'issued_at' => $c['issued_at'],
+        'doc_uid' => $docUid,
+        'verify_url' => $verifyUrl,
+        'founder_approved_by_name' => $founderName,
+    ];
 }
 
 $myLinkedin = '';
@@ -178,6 +288,8 @@ if ($role==='intern') {
   </div>
   <?php if ($role==='intern'): ?>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reqDocModal"><i class="bi bi-award me-1"></i>Request document</button>
+  <?php elseif ($role==='founder'): ?>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#directIssueModal"><i class="bi bi-lightning-charge-fill me-1"></i>Issue directly to a student</button>
   <?php endif; ?>
 </div>
 
@@ -206,19 +318,89 @@ if ($role==='intern') {
 </div></div></div>
 <?php endif; ?>
 
+<?php if ($role==='founder'):
+    $allStudents = $pdo->query("SELECT u.id, u.name, u.email, p.reg_number, p.batch FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.role='intern' ORDER BY u.name")->fetchAll();
+?>
+<div class="modal fade" id="directIssueModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content" style="background:#11141b;border:1px solid var(--border-strong);color:var(--text);border-radius:18px">
+  <form method="post" id="directIssueForm">
+    <input type="hidden" name="action" value="direct_issue">
+    <div class="modal-header border-0"><h5 class="serif m-0">Issue directly to a student</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <p class="muted" style="font-size:12.5px"><i class="bi bi-info-circle me-1"></i>No prior request needed — useful for past-batch alumni (see their self-reported batch below) or anyone you want to hand a document to proactively. This issues immediately.</p>
+      <div class="row g-2 mb-2">
+        <div class="col-md-6">
+          <label class="form-label">Student</label>
+          <select class="form-select" name="target_user_id" id="di-student" required onchange="document.getElementById('di-batch').value=this.selectedOptions[0].dataset.batch||''">
+            <option value="">— Select —</option>
+            <?php foreach ($allStudents as $s): ?>
+            <option value="<?= (int)$s['id'] ?>" data-batch="<?= e($s['batch'] ?? '') ?>"><?= e($s['name']) ?> — <?= e($s['email']) ?><?= $s['batch'] ? ' ('.e($s['batch']).')' : '' ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-3"><label class="form-label">Track</label><input class="form-control" name="track" placeholder="e.g. Media / AI & IoT"></div>
+        <div class="col-md-3"><label class="form-label">Batch</label><input class="form-control" id="di-batch" name="batch" placeholder="e.g. Batch 2"></div>
+        <div class="col-12">
+          <label class="form-label">Document type</label>
+          <select class="form-select" name="request_type" id="di-type" onchange="document.getElementById('di-cert-fields').style.display=this.value==='certificate'?'':'none';document.getElementById('di-letter-fields').style.display=this.value==='experience_letter'?'':'none'">
+            <option value="certificate">Certificate</option>
+            <option value="experience_letter">Experience Letter</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="di-cert-fields" class="row g-2 mb-2">
+        <div class="col-md-6"><label class="form-label">Final grade</label><input class="form-control" name="final_grade" placeholder="A / 88%"></div>
+        <div class="col-md-6"><label class="form-label">Mentor rating</label><select class="form-select" name="mentor_rating"><?php for($i=1;$i<=5;$i++): ?><option value="<?= $i ?>" <?= $i===5?'selected':'' ?>><?= str_repeat('★',$i) ?></option><?php endfor; ?></select></div>
+      </div>
+
+      <div id="di-letter-fields" class="row g-2 mb-2" style="display:none">
+        <div class="col-md-3"><label class="form-label">Pronoun</label><select class="form-select" name="pronoun"><option value="male">Male</option><option value="female">Female</option></select></div>
+        <div class="col-md-5"><label class="form-label">Role / Designation</label><input class="form-control" name="role_title" placeholder="e.g. Media Manager & Team Lead"></div>
+        <div class="col-md-2"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date"></div>
+        <div class="col-md-2"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date"></div>
+        <div class="col-12"><label class="form-label">Extra note (optional)</label><input class="form-control" name="extra_note" placeholder='e.g. "Also contributed as a Volunteer Member."'></div>
+        <div class="col-md-6"><label class="form-label">Work summary</label><textarea class="form-control" name="work_summary" rows="2"></textarea></div>
+        <div class="col-md-6"><label class="form-label">Closing feedback</label><textarea class="form-control" name="closing_feedback" rows="2"></textarea></div>
+        <div class="col-12 muted" style="font-size:11.5px"><i class="bi bi-info-circle me-1"></i>Father name &amp; CNIC are pulled automatically from the student's profile.</div>
+      </div>
+
+      <div class="mb-2"><label class="form-label">Internal note (optional)</label><input class="form-control" name="note"></div>
+    </div>
+    <div class="modal-footer border-0"><button class="btn btn-primary" onclick="return confirm('Issue this document immediately? This skips the usual request/approval stage.')"><i class="bi bi-lightning-charge-fill me-1"></i>Issue now</button></div>
+  </form>
+</div></div></div>
+<?php endif; ?>
+
 <?php
 $issued = array_filter($items, fn($i)=>$i['status']==='issued');
 if ($issued): foreach($issued as $c):
     $verifyUrl = cert_verify_url_for($pdo, $c);
     $isLetter  = $c['request_type'] === 'experience_letter';
+    if ($isLetter):
+        // The letter is its own white letterhead document (a different visual
+        // language than the dark portal), so it isn't embedded inline here —
+        // just a summary tile pointing at the real thing via ?view=doc.
 ?>
-  <?php render_certificate_card($c, $verifyUrl, $isLetter); ?>
-  <div class="text-center mb-4" style="margin-top:-18px">
+  <div class="glass card-pad mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-envelope-paper-fill" style="font-size:28px;color:var(--primary)"></i>
+      <div>
+        <div style="font-weight:700">Experience Letter — <?= e($c['name']) ?></div>
+        <div class="muted" style="font-size:12px"><?= e($c['role_title'] ?: $c['track']) ?> · Issued <?= e(date('M j, Y', strtotime($c['issued_at']))) ?></div>
+      </div>
+    </div>
     <a class="btn btn-primary btn-sm" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id']) ?>" target="_blank">
-      <i class="bi bi-download me-1"></i>Download / Print <?= $isLetter ? 'Experience Letter' : 'Certificate' ?>
+      <i class="bi bi-download me-1"></i>View / Download Experience Letter
     </a>
   </div>
-<?php endforeach; endif; ?>
+<?php else: ?>
+  <?php render_certificate_card($c, $verifyUrl, false); ?>
+  <div class="text-center mb-4" style="margin-top:-18px">
+    <a class="btn btn-primary btn-sm" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id']) ?>" target="_blank">
+      <i class="bi bi-download me-1"></i>Download / Print Certificate
+    </a>
+  </div>
+<?php endif; endforeach; endif; ?>
 
 <div class="glass card-pad">
   <h4 class="serif mb-3"><?= is_admin_role($role) ? 'Approval queue' : 'My requests' ?></h4>
@@ -238,11 +420,43 @@ if ($issued): foreach($issued as $c):
         <?php $waitHrs = $c['status']==='pending' ? (time() - strtotime($c['requested_at'])) / 3600 : 0; ?>
         <span class="badge <?= $c['status']==='issued'?'b-success':($c['status']==='rejected'?'b-danger':($waitHrs>48?'b-danger':($waitHrs>24?'b-warning':'b-muted'))) ?>"><?= e(ucfirst($c['status'])) ?></span>
       </div>
-      <?php if (is_admin_role($role) && $c['status']==='pending'): ?>
+      <?php if ($c['request_type'] === 'experience_letter' && $c['status']==='pending' && $role !== 'founder' && is_admin_role($role)): ?>
+      <!-- Issuing an experience letter is Founder-only (it's what attaches the
+           verification QR — see experience_letter_render_data()); Super Admin
+           can still reject, but the letter itself waits for the Founder. -->
+      <div class="row g-2 mt-2">
+        <div class="col-md-9 muted" style="font-size:12.5px"><i class="bi bi-hourglass-split me-1"></i>Awaiting the Founder &amp; CEO to issue this letter (issuing is what attaches the verification QR).</div>
+        <div class="col-md-3">
+          <form method="post"><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+            <button class="btn btn-sm btn-danger w-100" onclick="return confirm('Reject?')">Reject</button>
+          </form>
+        </div>
+      </div>
+      <?php elseif (is_admin_role($role) && $c['status']==='pending'): ?>
       <div class="row g-2 mt-2">
         <form method="post" class="row g-2 align-items-end col-12">
           <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-          <div class="col-md-3"><input class="form-control form-control-sm" name="final_grade" placeholder="<?= $c['request_type']==='experience_letter' ? 'Grade (optional for letters)' : 'Final grade (A / 88%)' ?>" <?= $c['request_type']==='experience_letter' ? '' : 'required' ?>></div>
+          <?php if ($c['request_type'] === 'experience_letter'):
+              $fcd = $pdo->prepare('SELECT start_date, end_date FROM form_c WHERE user_id=?'); $fcd->execute([(int)$c['user_id']]); $fcRow = $fcd->fetch() ?: [];
+              $pfq = $pdo->prepare('SELECT father_name, cnic FROM profiles WHERE user_id=?'); $pfq->execute([(int)$c['user_id']]); $pf = $pfq->fetch() ?: [];
+          ?>
+          <div class="col-md-3"><label class="form-label" style="font-size:11px">Pronoun (for Mr./Ms., S/O, D/O)</label>
+            <select class="form-select form-select-sm" name="pronoun"><option value="male">Male</option><option value="female">Female</option></select>
+          </div>
+          <div class="col-md-4"><label class="form-label" style="font-size:11px">Role / Designation</label><input class="form-control form-control-sm" name="role_title" placeholder="e.g. Media Manager & Team Lead" value="<?= e($c['track']) ?>" required></div>
+          <div class="col-md-2"><label class="form-label" style="font-size:11px">Start date</label><input type="date" class="form-control form-control-sm" name="start_date" value="<?= e($fcRow['start_date'] ?? '') ?>"></div>
+          <div class="col-md-2"><label class="form-label" style="font-size:11px">End date</label><input type="date" class="form-control form-control-sm" name="end_date" value="<?= e($fcRow['end_date'] ?? '') ?>"></div>
+          <div class="col-md-1 muted" style="font-size:10.5px" title="Father name / CNIC come from the student's profile"><?= ($pf['father_name'] ?? '') && ($pf['cnic'] ?? '') ? '<i class="bi bi-check-circle text-success"></i> Profile OK' : '<i class="bi bi-exclamation-triangle text-warning"></i> Missing father/CNIC' ?></div>
+          <div class="col-12"><label class="form-label" style="font-size:11px">Extra note (optional, e.g. "Also contributed as a Volunteer Member.")</label><input class="form-control form-control-sm" name="extra_note"></div>
+          <div class="col-md-6"><label class="form-label" style="font-size:11px">Work summary (2nd paragraph)</label><textarea class="form-control form-control-sm" name="work_summary" rows="2" required></textarea></div>
+          <div class="col-md-6"><label class="form-label" style="font-size:11px">Closing feedback (3rd paragraph)</label><textarea class="form-control form-control-sm" name="closing_feedback" rows="2" required></textarea></div>
+          <div class="col-md-8"><input class="form-control form-control-sm" name="note" placeholder="Reviewer note (optional, internal)"></div>
+          <div class="col-md-4 d-flex gap-2">
+            <button class="btn btn-sm btn-primary flex-fill" name="action" value="issue">Issue</button>
+            <button class="btn btn-sm btn-danger" name="action" value="reject" onclick="return confirm('Reject?')">Reject</button>
+          </div>
+          <?php else: ?>
+          <div class="col-md-3"><input class="form-control form-control-sm" name="final_grade" placeholder="Final grade (A / 88%)" required></div>
           <div class="col-md-2"><select class="form-select form-select-sm" name="mentor_rating">
             <?php for($i=1;$i<=5;$i++): ?><option value="<?= $i ?>"><?= str_repeat('★',$i) ?></option><?php endfor; ?>
           </select></div>
@@ -251,6 +465,7 @@ if ($issued): foreach($issued as $c):
             <button class="btn btn-sm btn-primary flex-fill" name="action" value="issue">Issue</button>
             <button class="btn btn-sm btn-danger" name="action" value="reject" onclick="return confirm('Reject?')">Reject</button>
           </div>
+          <?php endif; ?>
         </form>
       </div>
       <?php endif; ?>
