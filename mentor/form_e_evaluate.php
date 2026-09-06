@@ -46,11 +46,22 @@ function fe_autopopulate_tasks(PDO $pdo, int $formEId, int $studentId): void {
 if (($_GET['view'] ?? '') === 'preview' && !empty($_GET['student'])) {
     $studentId = (int)$_GET['student'];
     if (!fe_can_access((int)$me['id'], $role, $studentId)) { http_response_code(403); exit('Forbidden.'); }
-    $q = $pdo->prepare('SELECT fe.*, u.name AS student_name, p.reg_number FROM form_e fe JOIN users u ON u.id=fe.user_id LEFT JOIN profiles p ON p.user_id=fe.user_id WHERE fe.user_id=?');
+    $q = $pdo->prepare('SELECT fe.*, u.name AS student_name, p.reg_number, p.academic_advisor FROM form_e fe JOIN users u ON u.id=fe.user_id LEFT JOIN profiles p ON p.user_id=fe.user_id WHERE fe.user_id=?');
     $q->execute([$studentId]); $fe = $q->fetch();
     if (!$fe) { http_response_code(404); exit('No Form E record for this student.'); }
     $tq = $pdo->prepare('SELECT position, task_text AS text, rating FROM form_e_tasks WHERE form_e_id=? ORDER BY position');
     $tq->execute([$fe['id']]);
+    $founderName = '';
+    if ($fe['founder_approved_by']) {
+        $fnq = $pdo->prepare('SELECT name FROM users WHERE id=?'); $fnq->execute([$fe['founder_approved_by']]);
+        $founderName = (string)($fnq->fetchColumn() ?: '');
+    }
+    // If it's genuinely issued, show the real QR here too — Founder/Super
+    // Admin should see the true final look (with QR) from this same
+    // preview link once it's actually approved, not just the plain layout.
+    $docQ = $pdo->prepare('SELECT * FROM documents WHERE doc_type="form_e" AND ref_table="form_e" AND ref_id=? AND status="active"');
+    $docQ->execute([$fe['id']]); $doc = $docQ->fetch();
+
     require_once __DIR__ . '/../shared/form_e_template.php';
     render_form_e_document([
         'student_name' => $fe['student_name'], 'reg_number' => $fe['reg_number'],
@@ -61,8 +72,11 @@ if (($_GET['view'] ?? '') === 'preview' && !empty($_GET['student'])) {
         'diary_maintained' => $fe['diary_maintained'], 'attendance_pct' => $fe['attendance_pct'],
         'professional_attitude' => $fe['professional_attitude'], 'teamwork_rating' => $fe['teamwork_rating'],
         'report_submitted' => $fe['report_submitted'], 'certificate_attached' => $fe['certificate_attached'],
-        'comments' => $fe['supervisor_comments'], 'academic_supervisor_name' => $fe['academic_supervisor_name'],
+        'comments' => $fe['supervisor_comments'], 'academic_supervisor_name' => $fe['academic_advisor'] ?: $fe['academic_supervisor_name'],
         'evaluated_at' => $fe['evaluated_at'],
+        'founder_approved_by_name' => $founderName, 'founder_approved_at' => $fe['founder_approved_at'],
+        'doc_uid' => $doc['doc_uid'] ?? '', 'issued_at' => $doc['issued_at'] ?? null,
+        'verify_url' => $doc ? doc_verify_url($doc['doc_uid'], $doc['token']) : '',
     ], 'preview');
     exit;
 }
@@ -143,7 +157,7 @@ if ($studentId) {
     // ── Single-student evaluation form ──
     if (!fe_can_access((int)$user['id'], $user['role'], $studentId)) { http_response_code(403); echo '<div class="glass card-pad">You are not the assigned Team Lead for this student.</div>'; require __DIR__ . '/../includes/footer.php'; exit; }
 
-    $sq = $pdo->prepare('SELECT u.name, u.email, p.reg_number FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.id=?');
+    $sq = $pdo->prepare('SELECT u.name, u.email, p.reg_number, p.academic_advisor FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.id=?');
     $sq->execute([$studentId]); $student = $sq->fetch();
     $feq = $pdo->prepare('SELECT * FROM form_e WHERE user_id=?'); $feq->execute([$studentId]); $fe = $feq->fetch();
 
@@ -240,8 +254,9 @@ if ($studentId) {
               <textarea class="form-control" name="supervisor_comments" rows="4"><?= e($fe['supervisor_comments'] ?? '') ?></textarea>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Academic Supervisor Name</label>
-              <input class="form-control" name="academic_supervisor_name" value="<?= e($fe['academic_supervisor_name'] ?? '') ?>">
+              <label class="form-label">Academic Supervisor Name (Pak-Austria advisor)</label>
+              <input class="form-control" name="academic_supervisor_name" value="<?= e($fe['academic_supervisor_name'] ?: ($student['academic_advisor'] ?? '')) ?>">
+              <?php if (!empty($student['academic_advisor'])): ?><div class="muted mt-1" style="font-size:11.5px"><i class="bi bi-info-circle me-1"></i>Pre-filled from the student's own profile. Only change this if it's wrong.</div><?php endif; ?>
             </div>
           </div>
 

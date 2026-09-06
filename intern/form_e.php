@@ -13,7 +13,7 @@ $role = $me['role'];
 // ── Raw document view (no portal chrome) — Preview → Print → Download PDF ──
 if (($_GET['view'] ?? '') === 'doc') {
     $target = (is_admin_role($role) && !empty($_GET['uid'])) ? (int)$_GET['uid'] : (int)$me['id'];
-    $q = $pdo->prepare('SELECT fe.*, u.name AS student_name, p.reg_number
+    $q = $pdo->prepare('SELECT fe.*, u.name AS student_name, p.reg_number, p.academic_advisor
                          FROM form_e fe JOIN users u ON u.id = fe.user_id
                          LEFT JOIN profiles p ON p.user_id = fe.user_id
                          WHERE fe.user_id = ?');
@@ -21,6 +21,10 @@ if (($_GET['view'] ?? '') === 'doc') {
     $fe = $q->fetch();
     if (!$fe || $fe['status'] !== 'finalized') { http_response_code(404); exit('Form E is not available yet.'); }
     if ($role === 'intern' && $target !== (int)$me['id']) { http_response_code(403); exit('Forbidden.'); }
+    // Interns only ever see this once the Founder & CEO has actually
+    // approved it — even if status somehow reached "finalized" another way
+    // (e.g. a legacy record from before this approval stage existed).
+    if ($role === 'intern' && !$fe['founder_approved_by']) { http_response_code(404); exit('Form E is not yet fully verified.'); }
 
     $tq = $pdo->prepare('SELECT position, task_text AS text, rating FROM form_e_tasks WHERE form_e_id=? ORDER BY position');
     $tq->execute([$fe['id']]);
@@ -50,7 +54,7 @@ if (($_GET['view'] ?? '') === 'doc') {
         'diary_maintained' => $fe['diary_maintained'], 'attendance_pct' => $fe['attendance_pct'],
         'professional_attitude' => $fe['professional_attitude'], 'teamwork_rating' => $fe['teamwork_rating'],
         'report_submitted' => $fe['report_submitted'], 'certificate_attached' => $fe['certificate_attached'],
-        'comments' => $fe['supervisor_comments'], 'academic_supervisor_name' => $fe['academic_supervisor_name'],
+        'comments' => $fe['supervisor_comments'], 'academic_supervisor_name' => $fe['academic_advisor'] ?: $fe['academic_supervisor_name'],
         'evaluator_name' => $evalName, 'evaluated_at' => $fe['evaluated_at'],
         'founder_approved_by_name' => $founderName, 'founder_approved_at' => $fe['founder_approved_at'],
         'doc_uid' => $doc['doc_uid'] ?? '', 'issued_at' => $doc['issued_at'] ?? null,

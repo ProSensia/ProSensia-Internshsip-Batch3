@@ -71,7 +71,7 @@ $pending = $pdo->query("
 ")->fetchAll();
 
 $decided = $pdo->query("
-    SELECT r.*, u.name, u.email, p.reg_number, fe.id AS fe_id, fe.organization, fe.org_city,
+    SELECT r.*, u.name, u.email, p.reg_number, p.academic_advisor, fe.id AS fe_id, fe.organization, fe.org_city,
            fe.industry_supervisor_name, fe.industry_supervisor_designation, fe.start_date, fe.end_date,
            fe.academic_supervisor_name, fe.status AS fe_status
     FROM form_e_requests r JOIN users u ON u.id=r.user_id LEFT JOIN profiles p ON p.user_id=u.id
@@ -164,7 +164,11 @@ $decided = $pdo->query("
         <div class="col-md-6"><label class="form-label">Supervisor Designation</label><input class="form-control" name="supervisor_title" value="<?= e($r['industry_supervisor_designation']) ?>"></div>
         <div class="col-md-6"><label class="form-label">Start Date</label><input type="date" class="form-control" name="start_date" value="<?= e($r['start_date']) ?>"></div>
         <div class="col-md-6"><label class="form-label">End Date</label><input type="date" class="form-control" name="end_date" value="<?= e($r['end_date']) ?>"></div>
-        <div class="col-12"><label class="form-label">Academic Supervisor Name</label><input class="form-control" name="academic_supervisor_name" value="<?= e($r['academic_supervisor_name']) ?>"></div>
+        <div class="col-12">
+          <label class="form-label">Academic Supervisor Name (Pak-Austria advisor)</label>
+          <input class="form-control" name="academic_supervisor_name" value="<?= e($r['academic_supervisor_name'] ?: $r['academic_advisor']) ?>">
+          <?php if ($r['academic_advisor']): ?><div class="muted mt-1" style="font-size:11.5px"><i class="bi bi-info-circle me-1"></i>Pre-filled from the student's own profile: <b><?= e($r['academic_advisor']) ?></b>. Only override if it's wrong.</div><?php endif; ?>
+        </div>
       </div>
       <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save me-1"></i>Save</button></div>
     </form>
