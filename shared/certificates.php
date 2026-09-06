@@ -240,17 +240,20 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $docType = $crow['request_type'] === 'experience_letter' ? 'experience_letter' : 'certificate';
             $issued = issue_document($docType, 'certificate_requests', $id, (int)$crow['user_id'], $uid);
             log_audit($uid, $docType.'.issue', 'certificate_requests', $id, ['doc_uid' => $issued['doc_uid'] ?? null]);
+            notify((int)$crow['user_id'], $uid, $docType, 'Your ' . ($isLetterIssue ? 'Experience Letter' : 'Certificate') . ' has been issued — ready to view/download.', 'shared/certificates.php');
         }
         flash(($isLetterIssue ? 'Experience Letter' : 'Certificate').' issued ('.$serial.').');
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
     if (($_POST['action'] ?? '')==='reject' && is_admin_role($role)) {
         $id = (int)$_POST['id'];
-        $rtQ = $pdo->prepare('SELECT request_type FROM certificate_requests WHERE id=?'); $rtQ->execute([$id]);
-        $rt = $rtQ->fetchColumn() ?: 'certificate';
+        $rtQ = $pdo->prepare('SELECT request_type, user_id FROM certificate_requests WHERE id=?'); $rtQ->execute([$id]);
+        $rrow = $rtQ->fetch();
+        $rt = $rrow['request_type'] ?: 'certificate';
         $pdo->prepare("UPDATE certificate_requests SET status='rejected', reviewer_note=? WHERE id=?")
             ->execute([$_POST['note'],$id]);
         log_audit($uid, $rt.'.reject', 'certificate_requests', $id);
+        if ($rrow) notify((int)$rrow['user_id'], $uid, $rt, 'Your ' . ($rt === 'experience_letter' ? 'Experience Letter' : 'Certificate') . ' request was not approved.', 'shared/certificates.php');
         flash('Request rejected.');
         header('Location: '.base_url('shared/certificates.php')); exit;
     }

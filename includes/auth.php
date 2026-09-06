@@ -75,6 +75,18 @@ function is_admin_role(?string $role): bool {
     return in_array($role, ['super_admin', 'founder'], true);
 }
 
+/** Insert one row into the topbar notification bell's feed. Never throws —
+ *  a failed notification shouldn't ever block the actual action it's
+ *  attached to. */
+function notify(int $toUserId, ?int $fromUserId, string $type, string $message, string $link = ''): void {
+    global $pdo;
+    if ($toUserId === $fromUserId) return; // don't notify yourself about your own action
+    try {
+        $pdo->prepare("INSERT INTO notifications(to_user_id,from_user_id,type,message,link) VALUES(?,?,?,?,?)")
+            ->execute([$toUserId, $fromUserId, $type, $message, $link ?: null]);
+    } catch (Exception $e) {}
+}
+
 /** True if the singleton Founder & CEO role has already been claimed by anyone. */
 function founder_role_claimed(): bool {
     global $pdo;

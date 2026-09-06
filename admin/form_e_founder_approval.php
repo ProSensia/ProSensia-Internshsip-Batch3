@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([(int)$me['id'], $feId]);
             $issued = issue_document('form_e', 'form_e', $feId, (int)$fe['user_id'], (int)$me['id']);
             log_audit((int)$me['id'], 'form_e.founder_approve', 'form_e', $feId, ['comment' => $note, 'doc_uid' => $issued['doc_uid'] ?? null]);
+            notify((int)$fe['user_id'], (int)$me['id'], 'form_e', 'Your Form E has been approved and issued by the Founder & CEO.', 'intern/form_e.php');
             flash('Approved and issued. The student can now view, print, and verify their Form E.');
         } elseif ($a === 'return') {
             if ($note === '') {
@@ -30,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $pdo->prepare('UPDATE form_e SET status="pending_admin_review" WHERE id=?')->execute([$feId]);
                 log_audit((int)$me['id'], 'form_e.founder_return', 'form_e', $feId, ['comment' => $note]);
+                if (!empty($fe['admin_reviewed_by'])) {
+                    notify((int)$fe['admin_reviewed_by'], (int)$me['id'], 'form_e', 'The Founder returned a Form E for changes: ' . $note, 'admin/form_e_review.php');
+                }
                 flash('Returned to Super Admin review with your comment.');
             }
         }

@@ -63,6 +63,20 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='send') {
         if ($text !== '' || $att_path !== null) {
             $pdo->prepare('INSERT INTO chat_messages(channel_key,from_id,text,attachment_path,attachment_name) VALUES(?,?,?,?,?)')
                 ->execute([$ch, $uid, $text ?: '', $att_path, $att_name]);
+
+            // Notify the other party in a 1:1 DM, for the topbar bell.
+            // Team/channel broadcasts stay silent here on purpose — a
+            // notification per member on every team-channel post would
+            // flood everyone's bell instead of surfacing things actually
+            // "sent to me".
+            if (strpos($ch, 'dm:') === 0) {
+                $ids = explode('|', substr($ch, 3));
+                $otherId = (int)($ids[0] == $uid ? ($ids[1] ?? 0) : $ids[0]);
+                if ($otherId) {
+                    $preview = $text !== '' ? (mb_strlen($text) > 80 ? mb_substr($text, 0, 77) . '...' : $text) : ('Sent a file: ' . $att_name);
+                    notify($otherId, $uid, 'message', $user['name'] . ': ' . $preview, 'shared/messages.php?ch=' . urlencode($ch));
+                }
+            }
         }
     }
     header('Location: '.base_url('shared/messages.php?ch='.urlencode($ch))); exit;

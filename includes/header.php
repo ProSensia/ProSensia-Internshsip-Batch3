@@ -28,6 +28,20 @@ try {
         }
     }
 } catch(Exception $_xe) {}
+
+// Topbar notification bell — recent items "sent to me" (DMs, Form E/
+// certificate/experience-letter decisions, etc. — see notify() call sites)
+// plus an unread count. Kept to the last 20; the bell is a quick glance,
+// not a full history browser.
+$_notifs = []; $_notif_unread = 0;
+try {
+    $nq2 = $pdo->prepare("SELECT n.*, u.name AS from_name FROM notifications n LEFT JOIN users u ON u.id=n.from_user_id WHERE n.to_user_id=? ORDER BY n.created_at DESC LIMIT 20");
+    $nq2->execute([$user['id']]);
+    $_notifs = $nq2->fetchAll();
+    $uq2 = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE to_user_id=? AND read_at IS NULL");
+    $uq2->execute([$user['id']]);
+    $_notif_unread = (int)$uq2->fetchColumn();
+} catch (Exception $_ne2) {}
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -66,6 +80,30 @@ try {
         <div class="xp-lvl-bar-wrap"><div class="xp-lvl-bar-fill" style="width:<?= $_xp_pct ?>%"></div></div>
       </a>
       <?php endif; ?>
+      <div class="dropdown">
+        <button class="btn btn-ghost btn-sm position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications" id="notifBellBtn">
+          <i class="bi bi-bell" style="font-size:18px"></i>
+          <?php if ($_notif_unread > 0): ?><span class="notif-dot" style="position:absolute;top:2px;right:2px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px"><?= $_notif_unread>99?'99+':$_notif_unread ?></span><?php endif; ?>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-0" style="width:340px;max-width:90vw;background:var(--surface);border:1px solid var(--border-strong)">
+          <div class="d-flex justify-content-between align-items-center px-3 py-2" style="border-bottom:1px solid var(--border)">
+            <b style="font-size:13px">Notifications</b>
+            <?php if ($_notif_unread > 0): ?>
+            <form method="post" action="<?= base_url('shared/notifications_read.php') ?>"><input type="hidden" name="redirect" value="<?= e($_SERVER['REQUEST_URI']) ?>"><button class="btn btn-link btn-sm p-0" style="font-size:11.5px">Mark all read</button></form>
+            <?php endif; ?>
+          </div>
+          <div style="max-height:360px;overflow-y:auto">
+            <?php if (!$_notifs): ?>
+              <div class="p-3 muted" style="font-size:12.5px">Nothing yet — updates sent to you (messages, Form E/certificate decisions, etc.) will show up here.</div>
+            <?php else: foreach ($_notifs as $n): ?>
+              <a href="<?= $n['link'] ? base_url($n['link']) : '#' ?>" class="d-block px-3 py-2" style="text-decoration:none;color:inherit;border-bottom:1px solid var(--border);<?= $n['read_at'] ? '' : 'background:rgba(212,168,76,.06)' ?>">
+                <div style="font-size:12.5px;<?= $n['read_at'] ? 'color:var(--muted)' : 'color:var(--text);font-weight:600' ?>"><?= e($n['message']) ?></div>
+                <div class="muted" style="font-size:10.5px;margin-top:2px"><?= e(time_ago($n['created_at'])) ?><?= $n['from_name'] ? ' · '.e($n['from_name']) : '' ?></div>
+              </a>
+            <?php endforeach; endif; ?>
+          </div>
+        </div>
+      </div>
       <div class="text-end d-none d-md-block">
         <div style="font-size:13px"><?= e($user['name']) ?></div>
         <div class="small-cap"><?= e(role_label($user['role'])) ?></div>

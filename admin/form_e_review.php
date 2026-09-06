@@ -29,6 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('UPDATE form_e SET status="pending_evaluation", admin_reviewed_by=?, admin_reviewed_at=NOW() WHERE id=?')
                     ->execute([(int)$me['id'], $feId]);
                 log_audit((int)$me['id'], 'form_e.admin_return', 'form_e', $feId, ['comment' => $note]);
+                foreach (form_e_evaluators_for((int)$fe['user_id']) as $ev) {
+                    notify((int)$ev['id'], (int)$me['id'], 'form_e', 'A Form E evaluation was sent back to you: ' . $note, 'mentor/form_e_evaluate.php?student=' . (int)$fe['user_id']);
+                }
                 flash('Returned to the Team Lead with your comment.');
             }
         }

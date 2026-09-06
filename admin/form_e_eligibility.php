@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
             }
             log_audit($me['id'], 'form_e.eligibility_approve', 'form_e_requests', $id, ['student_id' => $r['user_id']]);
+            notify((int)$r['user_id'], (int)$me['id'], 'form_e', 'Your Form E access request was approved.', 'intern/form_e.php');
             flash('Form E access approved.');
         }
     }
@@ -41,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare('UPDATE form_e_requests SET status="rejected", reviewer_note=?, reviewed_at=NOW(), reviewed_by=? WHERE id=?')
                 ->execute([$note, $me['id'], $id]);
             log_audit($me['id'], 'form_e.eligibility_reject', 'form_e_requests', $id, ['student_id' => $r['user_id'], 'note' => $note]);
+            notify((int)$r['user_id'], (int)$me['id'], 'form_e', 'Your Form E access request was not approved.', 'intern/form_e.php');
             flash('Form E access rejected.');
         }
     }
