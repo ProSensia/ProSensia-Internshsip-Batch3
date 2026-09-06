@@ -1,5 +1,92 @@
 <?php
 require_once __DIR__ . '/../includes/security.php';
+
+/** The certificate/experience-letter card markup — shared by the in-portal
+ *  list view and the standalone print/download view below, so both always
+ *  look identical. */
+function render_certificate_card(array $c, string $verifyUrl, bool $isLetter): void {
+    ?>
+    <div class="cert mb-4">
+      <span class="cert-corner tl"></span><span class="cert-corner tr"></span>
+      <span class="cert-corner bl"></span><span class="cert-corner br"></span>
+      <div class="cert-shine"></div>
+      <div class="cert-top">
+        <img src="<?= logo_url() ?>" alt="ProSensia">
+        <span class="cert-tag">Official Document</span>
+      </div>
+      <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
+      <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
+      <p class="text-center muted">This is to certify that</p>
+      <div class="recipient"><?= e($c['name']) ?></div>
+      <?php if ($isLetter): ?>
+        <p class="text-center muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
+        <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+        <p class="text-center" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
+      <?php else: ?>
+        <p class="text-center muted">has successfully completed the</p>
+        <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+        <?php if ($c['mentor_rating']): ?><p class="text-center" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
+      <?php endif; ?>
+      <div class="meta">
+        <div>Doc ID · <b><?= e($c['serial']) ?></b></div>
+        <div>Issued · <b><?= e(date('M j, Y', strtotime($c['issued_at']))) ?></b></div>
+        <?php if (!$isLetter): ?><div>Grade · <b><?= e($c['final_grade']) ?></b></div><?php endif; ?>
+      </div>
+      <div class="text-center mt-3">
+        <div class="cert-qr-wrap">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=112x112&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px;display:block">
+        </div>
+        <div class="small-cap mt-2">Scan to verify · ProSensia Document Registry</div>
+      </div>
+    </div>
+    <?php
+}
+
+// cert_verify_url_for() is defined further below in this same file — PHP
+// hoists top-level function declarations, so it's callable here too.
+
+// ── Raw document view (no portal chrome) — Preview → Print → Download PDF ──
+if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
+    require_login();
+    $me = current_user();
+    $cq = $pdo->prepare('SELECT c.*, u.name FROM certificate_requests c JOIN users u ON u.id=c.user_id WHERE c.id=? AND c.status="issued"');
+    $cq->execute([(int)$_GET['id']]); $c = $cq->fetch();
+    if (!$c) { http_response_code(404); exit('Document not found.'); }
+    if ($me['role'] === 'intern' && (int)$c['user_id'] !== (int)$me['id']) { http_response_code(403); exit('Forbidden.'); }
+
+    $isLetter = $c['request_type'] === 'experience_letter';
+    $verifyUrl = cert_verify_url_for($pdo, $c);
+    $title = ($isLetter ? 'ExperienceLetter_' : 'Certificate_') . preg_replace('/[^A-Za-z0-9_-]/', '_', $c['name']);
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= e($title) ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= base_url('assets/css/style.css') ?>">
+    <style>
+      body{padding:40px 16px;display:flex;justify-content:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .doc-wrap{max-width:640px;width:100%}
+      .print-bar{max-width:640px;margin:0 auto 16px;display:flex;gap:10px;justify-content:flex-end}
+      @media print{ .print-bar{display:none} body{padding:0} }
+    </style>
+    </head>
+    <body>
+      <div class="doc-wrap">
+        <div class="print-bar">
+          <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / Save as PDF</button>
+        </div>
+        <?php render_certificate_card($c, $verifyUrl, $isLetter); ?>
+      </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 $page_title='Certificates'; $page_section='Administration'; $page_label='Certificates';
 require __DIR__ . '/../includes/header.php';
 require_login();
@@ -125,38 +212,11 @@ if ($issued): foreach($issued as $c):
     $verifyUrl = cert_verify_url_for($pdo, $c);
     $isLetter  = $c['request_type'] === 'experience_letter';
 ?>
-  <div class="cert mb-4">
-    <span class="cert-corner tl"></span><span class="cert-corner tr"></span>
-    <span class="cert-corner bl"></span><span class="cert-corner br"></span>
-    <div class="cert-shine"></div>
-    <div class="cert-top">
-      <img src="<?= logo_url() ?>" alt="ProSensia">
-      <span class="cert-tag">Official Document</span>
-    </div>
-    <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
-    <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
-    <p class="text-center muted">This is to certify that</p>
-    <div class="recipient"><?= e($c['name']) ?></div>
-    <?php if ($isLetter): ?>
-      <p class="text-center muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
-      <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-      <p class="text-center" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
-    <?php else: ?>
-      <p class="text-center muted">has successfully completed the</p>
-      <p class="text-center serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-      <?php if ($c['mentor_rating']): ?><p class="text-center" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
-    <?php endif; ?>
-    <div class="meta">
-      <div>Doc ID · <b><?= e($c['serial']) ?></b></div>
-      <div>Issued · <b><?= e(date('M j, Y', strtotime($c['issued_at']))) ?></b></div>
-      <?php if (!$isLetter): ?><div>Grade · <b><?= e($c['final_grade']) ?></b></div><?php endif; ?>
-    </div>
-    <div class="text-center mt-3">
-      <div class="cert-qr-wrap">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=112x112&bgcolor=11141b&color=f0d78c&data=<?= urlencode($verifyUrl) ?>" alt="QR" style="border-radius:8px;display:block">
-      </div>
-      <div class="small-cap mt-2">Scan to verify · ProSensia Document Registry</div>
-    </div>
+  <?php render_certificate_card($c, $verifyUrl, $isLetter); ?>
+  <div class="text-center mb-4" style="margin-top:-18px">
+    <a class="btn btn-primary btn-sm" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id']) ?>" target="_blank">
+      <i class="bi bi-download me-1"></i>Download / Print <?= $isLetter ? 'Experience Letter' : 'Certificate' ?>
+    </a>
   </div>
 <?php endforeach; endif; ?>
 
