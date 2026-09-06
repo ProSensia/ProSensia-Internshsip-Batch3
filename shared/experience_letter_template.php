@@ -53,12 +53,14 @@ function render_experience_letter_document(array $d, string $mode = 'final'): vo
   @media print{ body{background:#fff;padding:0} .el-page{box-shadow:none;margin:0;max-width:none;width:100%} }
   .el-watermark{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);
     font-size:52px;font-weight:800;color:rgba(180,60,40,.16);white-space:nowrap;z-index:2;pointer-events:none;letter-spacing:2px}
-  /* Content sits in the empty band the letterhead artwork already reserves
-     between the header block (top) and the footer icon row (bottom). Fixed
-     px sizes are calibrated for .el-page's 820px design width — deliberate,
-     not vw, since vw tracks the viewport rather than this capped container
-     and would render oversized on any screen wider than 820px. */
-  .el-content{position:absolute;top:23%;left:9.5%;right:8%;bottom:11%;z-index:1;display:flex;flex-direction:column}
+  /* Content starts at a fixed offset below the header artwork but its height
+     is NOT pinned to the footer — it must flow naturally so the QR sits
+     right after the text ends, not stretched/pushed down to a fixed box
+     bottom regardless of how much text there is. Fixed px sizes are
+     calibrated for .el-page's 820px design width — deliberate, not vw,
+     since vw tracks the viewport rather than this capped container and
+     would render oversized on any screen wider than 820px. */
+  .el-content{position:absolute;top:23%;left:9.5%;right:8%;z-index:1}
   .el-date{text-align:right;font-weight:700;font-size:13.5px;margin-bottom:16px}
   .el-title{text-align:center;font-weight:800;font-size:16.5px;letter-spacing:.02em;margin-bottom:12px}
   .el-subtitle{font-weight:800;font-size:14px;margin-bottom:9px}
@@ -66,7 +68,7 @@ function render_experience_letter_document(array $d, string $mode = 'final'): vo
   .el-verify-line{font-size:13px;margin:3px 0 16px}
   .el-verify-line a{color:#1a56db}
   .el-org{font-weight:800;font-size:13px;margin-bottom:8px}
-  .el-sign-row{display:flex;align-items:center;gap:14px;margin-top:auto}
+  .el-sign-row{display:flex;align-items:center;gap:14px;margin-top:18px}
   .el-verified-badge{display:flex;align-items:center;gap:12px}
   .el-verified-badge img{width:78px;height:78px;border-radius:8px;border:1px solid #eee}
   .el-verified-text b{color:#0a7a2f;font-size:12.5px;display:block}

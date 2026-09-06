@@ -43,8 +43,7 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (has_perm($role,'intern/assignments.php')): nav_link('intern/assignments.php','bi-clipboard-check','Assignments'); endif; ?>
   <?php if (has_perm($role,'shared/materials.php')): nav_link('shared/materials.php','bi-book','Materials'); endif; ?>
   <?php if (has_perm($role,'shared/attendance.php')): nav_link('shared/attendance.php','bi-calendar-check','Attendance'); endif; ?>
-  <?php if (has_perm($role,'intern/formc.php')): nav_link('intern/formc.php','bi-file-earmark-text','Form C'); endif; ?>
-  <?php // "Form E" no separate nav entry — it's one of the rows inside "Forms & Documents" below (was a duplicate). ?>
+  <?php // "Form C" and "Form E" have no separate nav entries — both are rows inside "Forms & Documents" below (were duplicates). ?>
   <?php if (has_perm($role,'intern/documents.php')): nav_link('intern/documents.php','bi-folder2-open','Forms & Documents'); endif; ?>
   <?php if (has_perm($role,'mentor/form_e_evaluate.php')): nav_link('mentor/form_e_evaluate.php','bi-clipboard2-pulse','Evaluate Form E'); endif; ?>
   <?php if (has_perm($role,'intern/motivation.php')): nav_link('intern/motivation.php','bi-chat-quote','Motivation & Goals'); endif; ?>

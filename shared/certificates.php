@@ -75,20 +75,36 @@ if (($_GET['view'] ?? '') === 'doc' && !empty($_GET['id'])) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/css/style.css') ?>">
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
-      body{padding:40px 16px;display:flex;justify-content:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{padding:40px 16px;display:flex;justify-content:center}
       .doc-wrap{max-width:640px;width:100%}
       .print-bar{max-width:640px;margin:0 auto 16px;display:flex;gap:10px;justify-content:flex-end}
-      @media print{ .print-bar{display:none} body{padding:0} }
     </style>
     </head>
     <body>
       <div class="doc-wrap">
         <div class="print-bar">
-          <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / Save as PDF</button>
+          <button class="btn btn-primary btn-sm" id="dlPngBtn"><i class="bi bi-image me-1"></i>Download PNG</button>
         </div>
         <?php render_certificate_card($c, $verifyUrl, false); ?>
       </div>
+      <script>
+      document.getElementById('dlPngBtn').addEventListener('click', function () {
+        var btn = this, original = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = 'Generating…';
+        html2canvas(document.querySelector('.cert'), { backgroundColor: '#0e1118', scale: 2, useCORS: true }).then(function (canvas) {
+          var a = document.createElement('a');
+          a.download = <?= json_encode($title) ?> + '.png';
+          a.href = canvas.toDataURL('image/png');
+          document.body.appendChild(a); a.click(); a.remove();
+          btn.disabled = false; btn.innerHTML = original;
+        }).catch(function (err) {
+          alert('Could not generate the PNG: ' + err);
+          btn.disabled = false; btn.innerHTML = original;
+        });
+      });
+      </script>
     </body>
     </html>
     <?php
@@ -124,6 +140,31 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             flash($created ? 'Request submitted to Super Admin.' : 'You already have a request on file for this document type.');
         } else {
             flash('You must have an approved Enrollment AND an approved Form C first.');
+        }
+        header('Location: '.base_url('shared/certificates.php')); exit;
+    }
+    // Team Lead (assigned mentor) or admin can fill in/edit an Experience
+    // Letter's details — dates, role, summary, feedback — while it's still
+    // pending. This never issues it (status stays "pending"); only the
+    // Founder's separate "Issue & Attach QR" action does that.
+    if (($_POST['action'] ?? '')==='save_letter_details') {
+        $id = (int)($_POST['id'] ?? 0);
+        $rq = $pdo->prepare("SELECT user_id, request_type FROM certificate_requests WHERE id=? AND status='pending'");
+        $rq->execute([$id]); $row = $rq->fetch();
+        $authorized = $row && $row['request_type'] === 'experience_letter'
+            && (is_admin_role($role) || ($role === 'mentor' && can_evaluate_form_e($uid, (int)$row['user_id'])));
+        if ($authorized) {
+            $pdo->prepare("UPDATE certificate_requests SET pronoun=?,role_title=?,work_summary=?,closing_feedback=?,extra_note=?,start_date=?,end_date=? WHERE id=?")
+                ->execute([
+                    ($_POST['pronoun'] ?? '') === 'female' ? 'female' : 'male',
+                    trim($_POST['role_title'] ?? ''), trim($_POST['work_summary'] ?? ''), trim($_POST['closing_feedback'] ?? ''),
+                    trim($_POST['extra_note'] ?? ''), $_POST['start_date'] ?: null, $_POST['end_date'] ?: null,
+                    $id,
+                ]);
+            log_audit($uid, 'experience_letter.edit_details', 'certificate_requests', $id);
+            flash('Details saved.' . ($role !== 'founder' ? ' The Founder & CEO can now review and issue it.' : ''));
+        } else {
+            flash('Not authorized to edit this request.');
         }
         header('Location: '.base_url('shared/certificates.php')); exit;
     }
@@ -402,7 +443,7 @@ if ($issued): foreach($issued as $c):
   <?php render_certificate_card($c, $verifyUrl, false); ?>
   <div class="text-center mb-4" style="margin-top:-18px">
     <a class="btn btn-primary btn-sm" href="<?= base_url('shared/certificates.php?view=doc&id=' . (int)$c['id']) ?>" target="_blank">
-      <i class="bi bi-download me-1"></i>Download / Print Certificate
+      <i class="bi bi-image me-1"></i>Download Certificate (PNG)
     </a>
   </div>
 <?php endif; endforeach; endif; ?>
@@ -425,42 +466,47 @@ if ($issued): foreach($issued as $c):
         <?php $waitHrs = $c['status']==='pending' ? (time() - strtotime($c['requested_at'])) / 3600 : 0; ?>
         <span class="badge <?= $c['status']==='issued'?'b-success':($c['status']==='rejected'?'b-danger':($waitHrs>48?'b-danger':($waitHrs>24?'b-warning':'b-muted'))) ?>"><?= e(ucfirst($c['status'])) ?></span>
       </div>
-      <?php if ($c['request_type'] === 'experience_letter' && $c['status']==='pending' && $role !== 'founder' && is_admin_role($role)): ?>
-      <!-- Issuing an experience letter is Founder-only (it's what attaches the
-           verification QR — see experience_letter_render_data()); Super Admin
-           can still reject, but the letter itself waits for the Founder. -->
+      <?php
+      $isPendingLetter = $c['request_type']==='experience_letter' && $c['status']==='pending';
+      $canEditLetter = $isPendingLetter && (is_admin_role($role) || ($role==='mentor' && can_evaluate_form_e($uid,(int)$c['user_id'])));
+      ?>
+      <?php if ($canEditLetter):
+          $fcd = $pdo->prepare('SELECT start_date, end_date FROM form_c WHERE user_id=?'); $fcd->execute([(int)$c['user_id']]); $fcRow = $fcd->fetch() ?: [];
+          $pfq = $pdo->prepare('SELECT father_name, cnic FROM profiles WHERE user_id=?'); $pfq->execute([(int)$c['user_id']]); $pf = $pfq->fetch() ?: [];
+      ?>
+      <!-- Team Lead (assigned mentor) or admin fills in/edits the letter's
+           details. Only the Founder & CEO can actually issue it (attaches
+           the verification QR) — see experience_letter_render_data(). -->
       <div class="row g-2 mt-2">
-        <div class="col-md-9 muted" style="font-size:12.5px"><i class="bi bi-hourglass-split me-1"></i>Awaiting the Founder &amp; CEO to issue this letter (issuing is what attaches the verification QR).</div>
-        <div class="col-md-3">
-          <form method="post"><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-            <button class="btn btn-sm btn-danger w-100" onclick="return confirm('Reject?')">Reject</button>
-          </form>
-        </div>
+        <form method="post" class="row g-2 align-items-end col-12">
+          <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+          <div class="col-12 muted" style="font-size:11px"><i class="bi bi-person-badge me-1"></i><?= $role==='mentor' ? 'Editing as assigned Team Lead.' : 'Editing as admin.' ?> Founder &amp; CEO gives final verification below.</div>
+          <div class="col-md-3"><label class="form-label" style="font-size:11px">Pronoun (for Mr./Ms., S/O, D/O)</label>
+            <select class="form-select form-select-sm" name="pronoun"><option value="male" <?= ($c['pronoun'] ?? 'male')==='male'?'selected':'' ?>>Male</option><option value="female" <?= ($c['pronoun'] ?? '')==='female'?'selected':'' ?>>Female</option></select>
+          </div>
+          <div class="col-md-4"><label class="form-label" style="font-size:11px">Role / Designation</label><input class="form-control form-control-sm" name="role_title" placeholder="e.g. Media Manager & Team Lead" value="<?= e($c['role_title'] ?: $c['track']) ?>"></div>
+          <div class="col-md-2"><label class="form-label" style="font-size:11px">From date</label><input type="date" class="form-control form-control-sm" name="start_date" value="<?= e($c['start_date'] ?: ($fcRow['start_date'] ?? '')) ?>"></div>
+          <div class="col-md-2"><label class="form-label" style="font-size:11px">To date</label><input type="date" class="form-control form-control-sm" name="end_date" value="<?= e($c['end_date'] ?: ($fcRow['end_date'] ?? '')) ?>"></div>
+          <div class="col-md-1 muted" style="font-size:10.5px" title="Father name / CNIC come from the student's profile"><?= ($pf['father_name'] ?? '') && ($pf['cnic'] ?? '') ? '<i class="bi bi-check-circle text-success"></i> Profile OK' : '<i class="bi bi-exclamation-triangle text-warning"></i> Missing father/CNIC' ?></div>
+          <div class="col-12"><label class="form-label" style="font-size:11px">Extra note (optional, e.g. "Also contributed as a Volunteer Member.")</label><input class="form-control form-control-sm" name="extra_note" value="<?= e($c['extra_note'] ?? '') ?>"></div>
+          <div class="col-md-6"><label class="form-label" style="font-size:11px">Work summary (2nd paragraph)</label><textarea class="form-control form-control-sm" name="work_summary" rows="2"><?= e($c['work_summary'] ?? '') ?></textarea></div>
+          <div class="col-md-6"><label class="form-label" style="font-size:11px">Closing feedback (3rd paragraph)</label><textarea class="form-control form-control-sm" name="closing_feedback" rows="2"><?= e($c['closing_feedback'] ?? '') ?></textarea></div>
+          <?php if (is_admin_role($role)): ?><div class="col-md-8"><input class="form-control form-control-sm" name="note" placeholder="Reviewer note (optional, internal)" value="<?= e($c['reviewer_note'] ?? '') ?>"></div><?php endif; ?>
+          <div class="col-md-<?= is_admin_role($role) ? 4 : 12 ?> d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light flex-fill" name="action" value="save_letter_details">Save Details</button>
+            <?php if ($role === 'founder'): ?><button class="btn btn-sm btn-primary flex-fill" name="action" value="issue" onclick="return confirm('Issue and attach the verification QR? This is final.')">Issue &amp; Attach QR</button><?php endif; ?>
+            <?php if (is_admin_role($role)): ?><button class="btn btn-sm btn-danger" name="action" value="reject" onclick="return confirm('Reject?')">Reject</button><?php endif; ?>
+          </div>
+        </form>
+      </div>
+      <?php elseif ($isPendingLetter): ?>
+      <div class="row g-2 mt-2">
+        <div class="col-12 muted" style="font-size:12.5px"><i class="bi bi-hourglass-split me-1"></i>Awaiting Team Lead details and Founder &amp; CEO final issuance.</div>
       </div>
       <?php elseif (is_admin_role($role) && $c['status']==='pending'): ?>
       <div class="row g-2 mt-2">
         <form method="post" class="row g-2 align-items-end col-12">
           <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-          <?php if ($c['request_type'] === 'experience_letter'):
-              $fcd = $pdo->prepare('SELECT start_date, end_date FROM form_c WHERE user_id=?'); $fcd->execute([(int)$c['user_id']]); $fcRow = $fcd->fetch() ?: [];
-              $pfq = $pdo->prepare('SELECT father_name, cnic FROM profiles WHERE user_id=?'); $pfq->execute([(int)$c['user_id']]); $pf = $pfq->fetch() ?: [];
-          ?>
-          <div class="col-md-3"><label class="form-label" style="font-size:11px">Pronoun (for Mr./Ms., S/O, D/O)</label>
-            <select class="form-select form-select-sm" name="pronoun"><option value="male">Male</option><option value="female">Female</option></select>
-          </div>
-          <div class="col-md-4"><label class="form-label" style="font-size:11px">Role / Designation</label><input class="form-control form-control-sm" name="role_title" placeholder="e.g. Media Manager & Team Lead" value="<?= e($c['track']) ?>" required></div>
-          <div class="col-md-2"><label class="form-label" style="font-size:11px">Start date</label><input type="date" class="form-control form-control-sm" name="start_date" value="<?= e($fcRow['start_date'] ?? '') ?>"></div>
-          <div class="col-md-2"><label class="form-label" style="font-size:11px">End date</label><input type="date" class="form-control form-control-sm" name="end_date" value="<?= e($fcRow['end_date'] ?? '') ?>"></div>
-          <div class="col-md-1 muted" style="font-size:10.5px" title="Father name / CNIC come from the student's profile"><?= ($pf['father_name'] ?? '') && ($pf['cnic'] ?? '') ? '<i class="bi bi-check-circle text-success"></i> Profile OK' : '<i class="bi bi-exclamation-triangle text-warning"></i> Missing father/CNIC' ?></div>
-          <div class="col-12"><label class="form-label" style="font-size:11px">Extra note (optional, e.g. "Also contributed as a Volunteer Member.")</label><input class="form-control form-control-sm" name="extra_note"></div>
-          <div class="col-md-6"><label class="form-label" style="font-size:11px">Work summary (2nd paragraph)</label><textarea class="form-control form-control-sm" name="work_summary" rows="2" required></textarea></div>
-          <div class="col-md-6"><label class="form-label" style="font-size:11px">Closing feedback (3rd paragraph)</label><textarea class="form-control form-control-sm" name="closing_feedback" rows="2" required></textarea></div>
-          <div class="col-md-8"><input class="form-control form-control-sm" name="note" placeholder="Reviewer note (optional, internal)"></div>
-          <div class="col-md-4 d-flex gap-2">
-            <button class="btn btn-sm btn-primary flex-fill" name="action" value="issue">Issue</button>
-            <button class="btn btn-sm btn-danger" name="action" value="reject" onclick="return confirm('Reject?')">Reject</button>
-          </div>
-          <?php else: ?>
           <div class="col-md-3"><input class="form-control form-control-sm" name="final_grade" placeholder="Final grade (A / 88%)" required></div>
           <div class="col-md-2"><select class="form-select form-select-sm" name="mentor_rating">
             <?php for($i=1;$i<=5;$i++): ?><option value="<?= $i ?>"><?= str_repeat('★',$i) ?></option><?php endfor; ?>
@@ -470,7 +516,6 @@ if ($issued): foreach($issued as $c):
             <button class="btn btn-sm btn-primary flex-fill" name="action" value="issue">Issue</button>
             <button class="btn btn-sm btn-danger" name="action" value="reject" onclick="return confirm('Reject?')">Reject</button>
           </div>
-          <?php endif; ?>
         </form>
       </div>
       <?php endif; ?>
