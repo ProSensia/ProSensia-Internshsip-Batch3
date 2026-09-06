@@ -3,13 +3,13 @@ require_once __DIR__ . '/../includes/security.php';
 
 /** The certificate/experience-letter card markup — shared by the in-portal
  *  list view and the standalone print/download view below, so both always
- *  look identical. $ratio picks the aspect ratio / layout: '169' (default)
- *  is a landscape 16:9 card — like a shareable social graphic — with the
- *  text beside the seal and the meta row beside the QR so it actually fits
- *  a short wide frame; '11' (square, Instagram feed) and '45' (portrait,
- *  Instagram feed) reuse the original stacked layout, just height-capped to
- *  the given ratio. The markup is identical across ratios — only the CSS
- *  (see .cert-r169/.cert-r11/.cert-r45 in style.css) repositions it. */
+ *  look identical. $ratio picks the aspect ratio: '169' (default, landscape,
+ *  like a shareable social graphic), '11' (square, Instagram feed) or '45'
+ *  (portrait, Instagram feed) — the CSS (.cert-r169/.cert-r11/.cert-r45 in
+ *  style.css) sizes the box differently but all three keep the same
+ *  centered layout, no seal (the ProSensia logo already appears once at the
+ *  top — a second circular logo badge was redundant), and a bordered
+ *  letterhead-style inner frame in the same gold/navy palette. */
 function render_certificate_card(array $c, string $verifyUrl, bool $isLetter, string $ratio = '169'): void {
     $ratioClass = in_array($ratio, ['169','11','45'], true) ? 'cert-r' . $ratio : 'cert-r169';
     ?>
@@ -17,26 +17,24 @@ function render_certificate_card(array $c, string $verifyUrl, bool $isLetter, st
       <span class="cert-corner tl"></span><span class="cert-corner tr"></span>
       <span class="cert-corner bl"></span><span class="cert-corner br"></span>
       <div class="cert-shine"></div>
+      <div class="cert-frame"></div>
       <div class="cert-top">
         <img src="<?= logo_url() ?>" alt="ProSensia">
         <span class="cert-tag">Official Document</span>
       </div>
       <div class="cert-body-row">
-        <div class="seal"><img src="<?= logo_url() ?>" alt=""></div>
-        <div class="cert-text-col">
-          <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
-          <p class="cert-line muted">This is to certify that</p>
-          <div class="recipient"><?= e($c['name']) ?></div>
-          <?php if ($isLetter): ?>
-            <p class="cert-line muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
-            <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-            <p class="cert-line" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
-          <?php else: ?>
-            <p class="cert-line muted">has successfully completed the</p>
-            <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
-            <?php if ($c['mentor_rating']): ?><p class="cert-line" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
-          <?php endif; ?>
-        </div>
+        <h2><?= $isLetter ? 'Experience Letter' : 'Certificate of Internship Completion' ?></h2>
+        <p class="cert-line muted">This is to certify that</p>
+        <div class="recipient"><?= e($c['name']) ?></div>
+        <?php if ($isLetter): ?>
+          <p class="cert-line muted">successfully worked with ProSensia (SMC-Private Limited) as part of the</p>
+          <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+          <p class="cert-line" style="color:var(--primary-glow);font-size:13px">Contributed meaningfully to assigned tasks and demonstrated strong proficiency throughout the engagement.</p>
+        <?php else: ?>
+          <p class="cert-line muted">has successfully completed the</p>
+          <p class="cert-line serif" style="font-size:22px"><?= e($c['track']) ?> · <?= e($c['batch']) ?></p>
+          <?php if ($c['mentor_rating']): ?><p class="cert-line" style="color:var(--primary-glow)">Mentor rating: <?= str_repeat('★',(int)$c['mentor_rating']) ?></p><?php endif; ?>
+        <?php endif; ?>
       </div>
       <div class="cert-footer-row">
         <div class="meta">
