@@ -29,6 +29,16 @@ a:hover{color:var(--primary)}
 .sidebar .nav-link.active i{color:var(--primary-glow)}
 .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;backdrop-filter:blur(2px)}
 .sidebar-backdrop.show{display:block}
+/* Collapsible sidebar sub-menus (native <details>/<summary> — no JS needed)
+   for clusters of related admin pages, so the flat list doesn't grow one
+   row per feature forever. */
+.sidebar details.nav-group{margin:2px 8px}
+.sidebar details.nav-group summary{display:flex;align-items:center;gap:10px;padding:9px 12px;color:var(--text);border-radius:8px;font-size:14px;cursor:pointer;list-style:none}
+.sidebar details.nav-group summary::-webkit-details-marker{display:none}
+.sidebar details.nav-group summary:hover{background:var(--surface-2)}
+.sidebar details.nav-group summary i.bi-chevron-right{margin-left:auto;font-size:11px;color:var(--muted);transition:transform .15s ease}
+.sidebar details.nav-group[open] summary i.bi-chevron-right{transform:rotate(90deg)}
+.sidebar details.nav-group .nav-link{margin:1px 0 1px 20px}
 
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{min-height:64px;border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(11,13,18,.7);backdrop-filter:blur(8px);position:sticky;top:0;z-index:10}

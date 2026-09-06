@@ -18,6 +18,13 @@ function nav_link($href, $icon, $label, $badge = 0) {
   $bdg = $badge > 0 ? '<span class="notif-dot" style="background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px;margin-left:auto">'.($badge>99?'99+':$badge).'</span>' : '';
   echo '<a class="nav-link '.$active.'" href="'.$abs.'"><i class="bi '.$icon.'"></i><span style="flex:1">'.$label.'</span>'.$bdg.'</a>';
 }
+/** True if the current page is one of $hrefs — used to auto-expand the
+ *  sidebar sub-menu group the visitor is currently inside. */
+function nav_group_active(array $hrefs) {
+  global $current;
+  foreach ($hrefs as $h) { if (basename($current) === basename($h)) return true; }
+  return false;
+}
 ?>
 <aside class="sidebar">
   <div class="brand">
@@ -50,21 +57,49 @@ function nav_link($href, $icon, $label, $badge = 0) {
   <?php if (has_perm($role,'intern/social_post.php')): nav_link('intern/social_post.php','bi-megaphone','Daily Social Post'); endif; ?>
 
   <div class="nav-section">Administration</div>
-  <?php if (has_perm($role,'admin/daily_drop_upload.php')): nav_link('admin/daily_drop_upload.php','bi-cloud-upload','Daily Drop Upload'); endif; ?>
   <?php if (has_perm($role,'admin/users.php')): nav_link('admin/users.php','bi-people','Users & Approvals'); endif; ?>
-  <?php if (has_perm($role,'admin/import_daily_drop.php')): nav_link('admin/import_daily_drop.php','bi-cloud-arrow-up','Import Daily Drop'); endif; ?>
-  <?php if (has_perm($role,'admin/import.php')): nav_link('admin/import.php','bi-file-earmark-spreadsheet','Bulk Import'); endif; ?>
   <?php if (has_perm($role,'shared/teams.php')): nav_link('shared/teams.php','bi-diagram-3','Teams'); endif; ?>
   <?php if (has_perm($role,'shared/messages.php')): nav_link('shared/messages.php','bi-chat-dots','Messages'); endif; ?>
-  <?php if (has_perm($role,'shared/certificates.php')): nav_link('shared/certificates.php','bi-award','Certificates'); endif; ?>
-  <?php if (has_perm($role,'admin/form_e_eligibility.php')): nav_link('admin/form_e_eligibility.php','bi-person-check','Form E Eligibility'); endif; ?>
-  <?php if (has_perm($role,'admin/form_e_review.php')): nav_link('admin/form_e_review.php','bi-clipboard2-data','Form E Review'); endif; ?>
-  <?php if (has_perm($role,'admin/documents.php')): nav_link('admin/documents.php','bi-file-earmark-lock2','Document Registry'); endif; ?>
+
+  <?php
+  $contentPages = ['admin/daily_drop_upload.php','admin/import_daily_drop.php','admin/import.php','admin/task_log.php'];
+  $contentAny = array_filter($contentPages, fn($p) => has_perm($role,$p));
+  if ($contentAny): ?>
+  <details class="nav-group" <?= nav_group_active($contentPages) ? 'open' : '' ?>>
+    <summary><i class="bi bi-cloud-upload"></i><span style="flex:1">Daily Content</span><i class="bi bi-chevron-right"></i></summary>
+    <?php if (has_perm($role,'admin/daily_drop_upload.php')): nav_link('admin/daily_drop_upload.php','bi-cloud-upload','Daily Drop Upload'); endif; ?>
+    <?php if (has_perm($role,'admin/import_daily_drop.php')): nav_link('admin/import_daily_drop.php','bi-cloud-arrow-up','Import Daily Drop'); endif; ?>
+    <?php if (has_perm($role,'admin/import.php')): nav_link('admin/import.php','bi-file-earmark-spreadsheet','Bulk Import'); endif; ?>
+    <?php if (has_perm($role,'admin/task_log.php')): nav_link('admin/task_log.php','bi-clock-history','Task Version Log', $_notif_counts['admin/task_log.php'] ?? 0); endif; ?>
+  </details>
+  <?php endif; ?>
+
+  <?php
+  $docPages = ['shared/certificates.php','admin/form_e_eligibility.php','admin/form_e_review.php','admin/documents.php'];
+  $docAny = array_filter($docPages, fn($p) => has_perm($role,$p));
+  if ($docAny): ?>
+  <details class="nav-group" <?= nav_group_active($docPages) ? 'open' : '' ?>>
+    <summary><i class="bi bi-award"></i><span style="flex:1">Documents &amp; Verification</span><i class="bi bi-chevron-right"></i></summary>
+    <?php if (has_perm($role,'shared/certificates.php')): nav_link('shared/certificates.php','bi-award','Certificates'); endif; ?>
+    <?php if (has_perm($role,'admin/form_e_eligibility.php')): nav_link('admin/form_e_eligibility.php','bi-person-check','Form E Eligibility'); endif; ?>
+    <?php if (has_perm($role,'admin/form_e_review.php')): nav_link('admin/form_e_review.php','bi-clipboard2-data','Form E Review'); endif; ?>
+    <?php if (has_perm($role,'admin/documents.php')): nav_link('admin/documents.php','bi-file-earmark-lock2','Document Registry'); endif; ?>
+  </details>
+  <?php endif; ?>
+
   <?php if (has_perm($role,'shared/subscriptions.php')): nav_link('shared/subscriptions.php','bi-credit-card','Subscriptions'); endif; ?>
   <?php if (has_perm($role,'admin/motivation.php')): nav_link('admin/motivation.php','bi-bar-chart-steps','Motivation Analysis'); endif; ?>
-  <?php if (has_perm($role,'admin/settings.php')): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
-  <?php if (has_perm($role,'admin/security.php')): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
-  <?php if (has_perm($role,'admin/task_log.php')): nav_link('admin/task_log.php','bi-clock-history','Task Version Log', $_notif_counts['admin/task_log.php'] ?? 0); endif; ?>
-  <?php if (is_admin_role($role)): nav_link('admin/roles.php','bi-shield-shaded','Roles & Access'); endif; ?>
-  <?php if (in_array($role,['super_admin','founder'],true)): nav_link('admin/founder_claim.php','bi-award','Founder & CEO'); endif; ?>
+
+  <?php
+  $sysPages = ['admin/settings.php','admin/security.php','admin/roles.php','admin/founder_claim.php'];
+  $sysAny = has_perm($role,'admin/settings.php') || has_perm($role,'admin/security.php') || is_admin_role($role) || in_array($role,['super_admin','founder'],true);
+  if ($sysAny): ?>
+  <details class="nav-group" <?= nav_group_active($sysPages) ? 'open' : '' ?>>
+    <summary><i class="bi bi-gear"></i><span style="flex:1">System &amp; Access</span><i class="bi bi-chevron-right"></i></summary>
+    <?php if (has_perm($role,'admin/settings.php')): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
+    <?php if (has_perm($role,'admin/security.php')): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
+    <?php if (is_admin_role($role)): nav_link('admin/roles.php','bi-shield-shaded','Roles & Access'); endif; ?>
+    <?php if (in_array($role,['super_admin','founder'],true)): nav_link('admin/founder_claim.php','bi-award','Founder & CEO'); endif; ?>
+  </details>
+  <?php endif; ?>
 </aside>

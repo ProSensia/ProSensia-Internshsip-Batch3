@@ -6,8 +6,13 @@ require_role(['super_admin']);
 if ($_SERVER['REQUEST_METHOD']==='POST') {
   $a = $_POST['action'] ?? '';
   if ($a==='save_text') {
-    foreach (['cert_batch','cert_signatory','form_e_org_name','form_e_supervisor_name','form_e_supervisor_title'] as $k) {
-      $v = $_POST[$k] ?? '';
+    // This action is shared by several separate forms on this page (each
+    // submitting only its own subset of fields) — only touch a key that's
+    // actually present in this particular POST, otherwise submitting one
+    // form would blank out every other form's settings too.
+    foreach (['cert_batch','cert_signatory','form_e_org_name','form_e_supervisor_name','form_e_supervisor_title','active_batch'] as $k) {
+      if (!array_key_exists($k, $_POST)) continue;
+      $v = $_POST[$k];
       $pdo->prepare('INSERT INTO settings(k,v) VALUES(?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)')->execute([$k,$v]);
     }
     flash('Settings saved.');
@@ -37,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   header('Location: '.base_url('admin/settings.php')); exit;
 }
 
+$activeBatch = setting('active_batch', 'Batch 3 (Current)');
 $logo = setting('logo_path','assets/img/prosensia-logo.png');
 $partner = setting('partner_logo_path','');
 $batch = setting('cert_batch','Batch 3 — Summer 2026');
@@ -76,6 +82,21 @@ $unlock_min  = (int)setting('daily_unlock_min',  0);
         Interns in all fields are locked out until this time daily.
       </div>
     </div>
+  </form>
+</div>
+
+
+<!-- ── Active Batch / Internship Status ── -->
+<div class="glass card-pad mb-4" style="border-left:4px solid var(--danger)">
+  <h5 class="serif mb-1"><i class="bi bi-flag-fill me-2" style="color:var(--danger)"></i>Active Batch</h5>
+  <p class="muted mb-3" style="font-size:13px">
+    Every student's own reported batch (set once, at signup) is compared against this value. A student whose batch <strong>matches</strong> sees the normal daily-tasks dashboard. A student whose batch <strong>doesn't match</strong> — because you changed this when their batch ended — instead sees a "thank you, internship complete" screen that points them to Forms &amp; Documents to request their Certificate/Experience Letter.
+    New signups default their batch to whatever is set here right now, so changing this is also how a new batch's students start on the normal dashboard from day one.
+  </p>
+  <form method="post" class="row g-2 align-items-end" onsubmit="return confirm('Change the active batch to \'' + this.active_batch.value + '\'? Every current student whose own batch no longer matches this will immediately see the internship-ended screen instead of their dashboard.');">
+    <input type="hidden" name="action" value="save_text">
+    <div class="col-md-8"><label class="form-label">Currently active batch</label><input class="form-control" name="active_batch" value="<?= e($activeBatch) ?>"></div>
+    <div class="col-md-4"><button class="btn btn-primary w-100"><i class="bi bi-save me-1"></i>Save</button></div>
   </form>
 </div>
 

@@ -4,6 +4,41 @@ require __DIR__ . '/../includes/header.php';
 require_role(['intern','super_admin']);
 
 $uid = $user['id'];
+
+// Internship-ended screen: a student's own reported batch (set once at
+// signup, see profiles.batch) no longer matching the org-wide "currently
+// active" batch (admin/settings.php) means their batch has concluded — show
+// a thank-you + redirect to Forms & Documents instead of the normal daily
+// dashboard. Empty/missing batch (e.g. very old accounts predating this
+// column) fails safe to the normal dashboard rather than risking locking
+// someone out over a data gap. Super Admin viewing this page is unaffected
+// — this only ever applies to the intern role.
+if ($user['role'] === 'intern') {
+    $myBatchQ = $pdo->prepare('SELECT batch FROM profiles WHERE user_id=?'); $myBatchQ->execute([$uid]);
+    $myBatch = (string)($myBatchQ->fetchColumn() ?: '');
+    $activeBatch = setting('active_batch', 'Batch 3 (Current)');
+    if ($myBatch !== '' && $myBatch !== $activeBatch) {
+        ?>
+        <div class="glass card-pad text-center" style="max-width:640px;margin:60px auto">
+          <div style="font-size:52px">🎓</div>
+          <h1 class="serif mt-3" style="font-size:32px">Thank You, <?= e($user['name']) ?>!</h1>
+          <p class="muted" style="font-size:15px">
+            Your internship with ProSensia (<?= e($myBatch) ?>) has concluded. We genuinely appreciate the work and effort you put in — it made a real difference.
+          </p>
+          <p class="muted" style="font-size:14px">
+            You can now apply for your official Certificate and/or Experience Letter from Forms &amp; Documents.
+          </p>
+          <a class="btn btn-primary btn-lg mt-2" href="<?= base_url('intern/documents.php') ?>"><i class="bi bi-folder2-open me-2"></i>Go to Forms &amp; Documents</a>
+          <div class="alert alert-info mt-4 mb-0" style="font-size:13px;text-align:left">
+            <i class="bi bi-hourglass-split me-2"></i>Once you submit a request, please wait while it's processed — you'll be informed as soon as it's ready.
+          </div>
+        </div>
+        <?php
+        require __DIR__ . '/../includes/footer.php';
+        exit;
+    }
+}
+
 $prof = $pdo->prepare('SELECT * FROM profiles WHERE user_id=?'); $prof->execute([$uid]); $profile = $prof->fetch();
 $enroll = $pdo->prepare('SELECT * FROM enrollments WHERE user_id=? ORDER BY id DESC LIMIT 1'); $enroll->execute([$uid]); $enrollment = $enroll->fetch();
 $asgStats = $pdo->prepare("SELECT

@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $skills=trim($_POST['skills']??''); $bio=trim($_POST['bio']??'');
   $gh=trim($_POST['github']??''); $li=trim($_POST['linkedin']??''); $pf=trim($_POST['portfolio']??'');
   $dept=trim($_POST['department']??'');
-  $batch=trim($_POST['batch']??'') ?: 'Batch 3 (Current)';
+  $batch=trim($_POST['batch']??'') ?: setting('active_batch', 'Batch 3 (Current)');
 
   // Validate avatar is present and uploaded correctly
   if (empty($_FILES['avatar']['name']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
           <div class="col-md-5"><label class="form-label">Password (min 6)</label><input class="form-control" type="password" name="password" minlength="6" required></div>
           <div class="col-12">
             <label class="form-label">Which batch are you from?</label>
-            <input class="form-control" name="batch" value="Batch 3 (Current)" placeholder="e.g. Batch 3 (Current), Batch 2, Batch 1">
+            <input class="form-control" name="batch" value="<?= e(setting('active_batch', 'Batch 3 (Current)')) ?>" placeholder="e.g. Batch 3 (Current), Batch 2, Batch 1">
             <div class="muted" style="font-size:12px;margin-top:4px">From an earlier batch and just here for your Certificate/Experience Letter? Enter your batch and sign up anyway — Super Admin/Founder can verify and issue it once your account is approved.</div>
           </div>
         </div>
