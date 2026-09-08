@@ -22,6 +22,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([(int)$me['id'], $feId]);
             log_audit((int)$me['id'], 'form_e.admin_forward', 'form_e', $feId, ['comment' => $note]);
             flash('Forwarded to the Founder & CEO for final approval.');
+        } elseif ($a === 'founder_approve' && $me['role'] === 'founder') {
+            // The Founder doesn't need to "forward to Founder" — that's
+            // themselves. One step here covers both the endorsement and the
+            // final approval, and actually issues the document.
+            $pdo->prepare('UPDATE form_e SET status="finalized", admin_reviewed_by=?, admin_reviewed_at=NOW(), founder_approved_by=?, founder_approved_at=NOW() WHERE id=?')
+                ->execute([(int)$me['id'], (int)$me['id'], $feId]);
+            $issued = issue_document('form_e', 'form_e', $feId, (int)$fe['user_id'], (int)$me['id']);
+            log_audit((int)$me['id'], 'form_e.founder_approve', 'form_e', $feId, ['comment' => $note, 'doc_uid' => $issued['doc_uid'] ?? null]);
+            notify((int)$fe['user_id'], (int)$me['id'], 'form_e', 'Your Form E has been approved and issued by the Founder & CEO.', 'intern/form_e.php');
+            flash('Approved and issued. The student can now view, print, and verify their Form E.');
         } elseif ($a === 'return') {
             if ($note === '') {
                 flash('Please explain what needs to be fixed before returning it to the Team Lead.');
@@ -57,7 +67,7 @@ $queue = $pdo->query("
 <div class="d-flex justify-content-between align-items-end mb-4 flex-wrap gap-2">
   <div>
     <h1 class="serif mb-0" style="font-size:34px">Form E Review</h1>
-    <p class="muted mb-0">Team Lead evaluations awaiting your endorsement before they go to the Founder &amp; CEO for final approval.</p>
+    <p class="muted mb-0"><?= $user['role'] === 'founder' ? 'Team Lead evaluations ready for your final approval — preview each one, then approve to issue it directly.' : 'Team Lead evaluations awaiting your endorsement before they go to the Founder & CEO for final approval.' ?></p>
   </div>
   <span class="badge b-warning"><?= count($queue) ?> awaiting review</span>
 </div>
@@ -75,7 +85,18 @@ $queue = $pdo->query("
         </div>
         <a class="btn btn-outline-light btn-sm" href="<?= base_url('mentor/form_e_evaluate.php?view=preview&student=' . (int)$fe['user_id']) ?>" target="_blank"><i class="bi bi-eye me-1"></i>Preview</a>
       </div>
-      <?php if ($is_admin): ?>
+      <?php if ($user['role'] === 'founder'): ?>
+      <div class="row g-2 mt-1">
+        <form method="post" class="row g-2 align-items-end col-12">
+          <input type="hidden" name="fe_id" value="<?= (int)$fe['id'] ?>">
+          <div class="col-md-7"><input class="form-control form-control-sm" name="note" placeholder="Remark (required to return, optional to approve)"></div>
+          <div class="col-md-5 d-flex gap-2">
+            <button class="btn btn-sm btn-primary flex-fill" name="action" value="founder_approve" onclick="return confirm('Approve and issue this Form E right now? This is final and attaches the verification QR.')"><i class="bi bi-patch-check-fill me-1"></i>Approve &amp; Issue Now</button>
+            <button class="btn btn-sm btn-danger" name="action" value="return" onclick="return confirm('Return this to the Team Lead for changes?')"><i class="bi bi-reply me-1"></i>Return</button>
+          </div>
+        </form>
+      </div>
+      <?php elseif ($is_admin): ?>
       <div class="row g-2 mt-1">
         <form method="post" class="row g-2 align-items-end col-12">
           <input type="hidden" name="fe_id" value="<?= (int)$fe['id'] ?>">

@@ -67,8 +67,14 @@ require_role(['super_admin', 'management']);
 $is_admin = is_admin_role($user['role']);
 
 $pending = $pdo->query("
-    SELECT r.*, u.name, u.email, p.reg_number
+    SELECT r.*, u.name, u.email, u.created_at AS account_created_at,
+           p.reg_number, p.phone, p.university, p.degree, p.department, p.semester,
+           p.cnic, p.father_name, p.city, p.batch, p.linkedin, p.github,
+           en.track, en.batch AS enrollment_batch, en.status AS enrollment_status,
+           fc.status AS form_c_status
     FROM form_e_requests r JOIN users u ON u.id=r.user_id LEFT JOIN profiles p ON p.user_id=u.id
+    LEFT JOIN enrollments en ON en.id = (SELECT id FROM enrollments WHERE user_id=r.user_id ORDER BY id DESC LIMIT 1)
+    LEFT JOIN form_c fc ON fc.user_id = r.user_id
     WHERE r.status='pending' ORDER BY r.requested_at ASC
 ")->fetchAll();
 
@@ -127,6 +133,7 @@ function form_e_last_return(PDO $pdo, int $feId): ?array {
       <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
         <div>
           <b><?= e($r['name']) ?></b> <span class="muted" style="font-size:13px">(<?= e($r['reg_number'] ?? 'N/A') ?>)</span>
+          <button type="button" class="btn btn-ghost btn-sm p-0 px-1" data-bs-toggle="modal" data-bs-target="#feReqDetails<?= (int)$r['id'] ?>" title="See full details"><i class="bi bi-info-circle"></i></button>
           <div class="muted" style="font-size:12px"><?= e($r['email']) ?> · Requested <?= e(date('M j, Y g:i A', strtotime($r['requested_at']))) ?></div>
         </div>
         <?php $waitHrs = (time() - strtotime($r['requested_at'])) / 3600; ?>
@@ -145,6 +152,34 @@ function form_e_last_return(PDO $pdo, int $feId): ?array {
       </div>
       <?php endif; ?>
     </div>
+
+    <!-- Full-details popup — everything relevant to deciding this request,
+         without leaving the page or hunting through Users & Approvals. -->
+    <div class="modal fade" id="feReqDetails<?= (int)$r['id'] ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content" style="background:#11141b;border:1px solid var(--border-strong);color:var(--text);border-radius:18px">
+      <div class="modal-header border-0"><h5 class="serif m-0"><?= e($r['name']) ?></h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" style="font-size:13px">
+        <div class="row g-2">
+          <div class="col-6"><span class="muted">Email</span><br><?= e($r['email']) ?></div>
+          <div class="col-6"><span class="muted">Reg #</span><br><?= e($r['reg_number'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Phone</span><br><?= e($r['phone'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">CNIC</span><br><?= e($r['cnic'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Father Name</span><br><?= e($r['father_name'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">City</span><br><?= e($r['city'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">University</span><br><?= e($r['university'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Degree</span><br><?= e($r['degree'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Department</span><br><?= e($r['department'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Semester</span><br><?= e($r['semester'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Batch (self-reported)</span><br><?= e($r['batch'] ?: '—') ?></div>
+          <div class="col-6"><span class="muted">Track / Batch (enrollment)</span><br><?= e($r['track'] ?: '—') ?><?= $r['enrollment_batch'] ? ' · '.e($r['enrollment_batch']) : '' ?></div>
+          <div class="col-6"><span class="muted">Enrollment status</span><br><?= $r['enrollment_status'] ? e(ucfirst($r['enrollment_status'])) : '—' ?></div>
+          <div class="col-6"><span class="muted">Form C status</span><br><?= $r['form_c_status'] ? e(ucfirst($r['form_c_status'])) : '—' ?></div>
+          <?php if ($r['linkedin']): ?><div class="col-6"><span class="muted">LinkedIn</span><br><a href="<?= e($r['linkedin']) ?>" target="_blank" rel="noopener">Profile</a></div><?php endif; ?>
+          <?php if ($r['github']): ?><div class="col-6"><span class="muted">GitHub</span><br><a href="<?= e($r['github']) ?>" target="_blank" rel="noopener">Profile</a></div><?php endif; ?>
+          <div class="col-6"><span class="muted">Account created</span><br><?= $r['account_created_at'] ? e(date('M j, Y', strtotime($r['account_created_at']))) : '—' ?></div>
+        </div>
+        <a class="btn btn-outline-light btn-sm mt-3 w-100" href="<?= base_url('admin/users.php') ?>" target="_blank"><i class="bi bi-person-vcard me-1"></i>Open full profile in Users &amp; Approvals</a>
+      </div>
+    </div></div></div>
   <?php endforeach; ?>
 </div>
 
