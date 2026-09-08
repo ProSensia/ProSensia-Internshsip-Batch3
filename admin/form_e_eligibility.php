@@ -75,11 +75,33 @@ $pending = $pdo->query("
 $decided = $pdo->query("
     SELECT r.*, u.name, u.email, p.reg_number, p.academic_advisor, fe.id AS fe_id, fe.organization, fe.org_city,
            fe.industry_supervisor_name, fe.industry_supervisor_designation, fe.start_date, fe.end_date,
-           fe.academic_supervisor_name, fe.status AS fe_status
+           fe.academic_supervisor_name, fe.status AS fe_status,
+           fe.evaluator_id, fe.evaluated_at, fe.admin_reviewed_by, fe.admin_reviewed_at,
+           fe.founder_approved_by, fe.founder_approved_at
     FROM form_e_requests r JOIN users u ON u.id=r.user_id LEFT JOIN profiles p ON p.user_id=u.id
     LEFT JOIN form_e fe ON fe.user_id=r.user_id
     WHERE r.status!='pending' ORDER BY r.reviewed_at DESC
 ")->fetchAll();
+
+// Full-pipeline status, for every student at once, so the Founder can scan
+// the whole list and see exactly who's stuck where, and chase whoever's
+// holding it up — that's the whole point of this view.
+$feStageBadges = [
+    'pending_evaluation'       => ['Awaiting Team Lead',          'b-warning', 'bi-person-workspace'],
+    'evaluated'                => ['Evaluated',                   'b-warning', 'bi-person-workspace'],
+    'pending_admin_review'     => ['Awaiting Super Admin Review', 'b-info',    'bi-clipboard2-data'],
+    'pending_founder_approval' => ['Awaiting Founder Approval',   'b-info',    'bi-award'],
+    'finalized'                => ['Issued & Verified',           'b-success', 'bi-patch-check-fill'],
+];
+/** Most recent "sent back" event for one Form E record, or null. */
+function form_e_last_return(PDO $pdo, int $feId): ?array {
+    $q = $pdo->prepare("SELECT a.*, u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id
+                         WHERE a.entity_type='form_e' AND a.entity_id=? AND a.action IN ('form_e.admin_return','form_e.founder_return')
+                         ORDER BY a.created_at DESC LIMIT 1");
+    $q->execute([$feId]);
+    $row = $q->fetch();
+    return $row ?: null;
+}
 ?>
 <div class="d-flex justify-content-between align-items-end mb-4 flex-wrap gap-2">
   <div>
@@ -139,7 +161,26 @@ $decided = $pdo->query("
             <?php if ($r['reviewed_at']): ?> · Decided <?= e(time_ago($r['reviewed_at'])) ?> <span title="Turnaround time">(took <?= e(elapsed_between($r['requested_at'], $r['reviewed_at'])) ?>)</span><?php endif; ?>
           </div>
           <?php if ($r['status'] === 'rejected' && $r['reviewer_note']): ?><div class="muted" style="font-size:12px">Reason: <?= e($r['reviewer_note']) ?></div><?php endif; ?>
-          <?php if ($r['status'] === 'approved' && $r['fe_id']): ?><div class="muted" style="font-size:12px">Evaluation status: <?= e(ucfirst(str_replace('_',' ',$r['fe_status']))) ?></div><?php endif; ?>
+
+          <?php if ($r['status'] === 'approved' && $r['fe_id']):
+              [$stageLabel, $stageCls, $stageIcon] = $feStageBadges[$r['fe_status']] ?? [$r['fe_status'], 'b-muted', 'bi-question-circle'];
+              $lastStageChange = $r['founder_approved_at'] ?: $r['admin_reviewed_at'] ?: $r['evaluated_at'] ?: $r['reviewed_at'];
+              $lastReturn = form_e_last_return($pdo, (int)$r['fe_id']);
+          ?>
+          <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge <?= $stageCls ?>"><i class="bi <?= $stageIcon ?> me-1"></i><?= e($stageLabel) ?></span>
+            <?php if ($lastStageChange): ?><span class="muted" style="font-size:11.5px">at this stage <?= e(time_ago($lastStageChange)) ?></span><?php endif; ?>
+          </div>
+          <?php if ($lastReturn):
+              $retMeta = json_decode($lastReturn['meta'] ?? '', true) ?: [];
+              $retStage = $lastReturn['action'] === 'form_e.founder_return' ? 'Founder' : 'Super Admin';
+          ?>
+          <div class="mt-1" style="font-size:11.5px;color:var(--warning)">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Sent back by <?= $retStage ?> (<?= e($lastReturn['actor_name'] ?? '—') ?>) <?= e(time_ago($lastReturn['created_at'])) ?>
+            <?php if (!empty($retMeta['comment'])): ?> — "<?= e($retMeta['comment']) ?>"<?php endif; ?>
+          </div>
+          <?php endif; ?>
+          <?php endif; ?>
         </div>
         <div class="d-flex align-items-start gap-2">
           <span class="badge <?= $r['status']==='approved'?'b-success':'b-danger' ?>"><?= ucfirst($r['status']) ?></span>
