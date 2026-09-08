@@ -97,7 +97,7 @@ function nav_group_active(array $hrefs) {
   <details class="nav-group" <?= nav_group_active($sysPages) ? 'open' : '' ?>>
     <summary><i class="bi bi-gear"></i><span style="flex:1">System &amp; Access</span><i class="bi bi-chevron-right"></i></summary>
     <?php if (has_perm($role,'admin/settings.php')): nav_link('admin/settings.php','bi-gear','Settings'); endif; ?>
-    <?php if (has_perm($role,'admin/security.php')): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
+    <?php if ($role === 'founder'): nav_link('admin/security.php','bi-shield-lock','Security'); endif; ?>
     <?php if (is_admin_role($role)): nav_link('admin/roles.php','bi-shield-shaded','Roles & Access'); endif; ?>
     <?php if (in_array($role,['super_admin','founder'],true)): nav_link('admin/founder_claim.php','bi-award','Founder & CEO'); endif; ?>
   </details>

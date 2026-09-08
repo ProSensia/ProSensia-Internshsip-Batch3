@@ -221,7 +221,6 @@ function _default_perms(): array {
         'admin/users.php'              => ['super_admin','management'],
         'admin/import.php'             => ['super_admin'],
         'admin/settings.php'           => ['super_admin'],
-        'admin/security.php'           => ['super_admin'],
         'admin/roles.php'              => ['super_admin'],
     ];
 }

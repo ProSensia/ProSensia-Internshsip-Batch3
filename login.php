@@ -1,6 +1,6 @@
 <?php
 // login.php — sign in
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/security.php';
 if (current_user()) { header('Location: '.role_home(current_user()['role'])); exit; }
 
 $err='';
@@ -9,12 +9,23 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $stmt = $pdo->prepare('SELECT * FROM users WHERE email=? LIMIT 1');
   $stmt->execute([$email]);
   $u = $stmt->fetch();
-  if (!$u) { $err = 'No account with that email.'; }
+  if (!$u) {
+    $err = 'No account with that email.';
+    log_audit(null, 'auth.login_failed', 'users', 0, ['email' => $email, 'reason' => 'no_such_account']);
+  }
   elseif ($u['status']==='pending') { $err = 'Your account is pending approval by the super admin.'; }
   elseif ($u['status']==='rejected'||$u['status']==='inactive') { $err = 'Account is not active. Please contact admin.'; }
-  elseif (!password_verify($pass, $u['password']) && $pass !== 'password123') { $err = 'Invalid password.'; }
+  elseif (!password_verify($pass, $u['password'])) {
+    // No password bypass here, deliberately — this used to also accept the
+    // literal string "password123" for every single account regardless of
+    // its real password, which is a full authentication bypass, not a
+    // convenience. Removed; there is no backdoor now.
+    $err = 'Invalid password.';
+    log_audit((int)$u['id'], 'auth.login_failed', 'users', (int)$u['id'], ['reason' => 'wrong_password']);
+  }
   else {
     $_SESSION['user'] = ['id'=>(int)$u['id'],'name'=>$u['name'],'email'=>$u['email'],'role'=>$u['role']];
+    log_audit((int)$u['id'], 'auth.login', 'users', (int)$u['id'], ['ip' => $_SERVER['REMOTE_ADDR'] ?? '']);
     header('Location: '.role_home($u['role'])); exit;
   }
 }

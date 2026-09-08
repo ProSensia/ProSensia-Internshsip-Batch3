@@ -53,7 +53,9 @@ $recent = $pdo->query('SELECT id,name,email,role,created_at FROM users ORDER BY 
       <a class="btn btn-outline-light text-start" href="<?= base_url('shared/certificates.php') ?>"><i class="bi bi-award me-2"></i>Review certificate requests</a>
       <a class="btn btn-outline-light text-start" href="<?= base_url('intern/formc.php') ?>"><i class="bi bi-file-earmark-text me-2"></i>Review Form C submissions</a>
       <a class="btn btn-outline-light text-start" href="<?= base_url('shared/messages.php') ?>"><i class="bi bi-megaphone me-2"></i>Post announcement</a>
+      <?php if ($user['role'] === 'founder'): ?>
       <a class="btn btn-outline-light text-start" href="<?= base_url('admin/security.php') ?>"><i class="bi bi-shield-lock me-2"></i>Security dashboard</a>
+      <?php endif; ?>
     </div>
   </div>
 </div>

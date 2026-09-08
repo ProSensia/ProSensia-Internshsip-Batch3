@@ -134,6 +134,7 @@ function form_e_last_return(PDO $pdo, int $feId): ?array {
         <div>
           <b><?= e($r['name']) ?></b> <span class="muted" style="font-size:13px">(<?= e($r['reg_number'] ?? 'N/A') ?>)</span>
           <button type="button" class="btn btn-ghost btn-sm p-0 px-1" data-bs-toggle="modal" data-bs-target="#feReqDetails<?= (int)$r['id'] ?>" title="See full details"><i class="bi bi-info-circle"></i></button>
+          <button type="button" class="btn btn-ghost btn-sm p-0 px-1" data-bs-toggle="modal" data-bs-target="#feReqReady<?= (int)$r['id'] ?>" title="Check data readiness &amp; approve"><i class="bi bi-eye"></i></button>
           <div class="muted" style="font-size:12px"><?= e($r['email']) ?> · Requested <?= e(date('M j, Y g:i A', strtotime($r['requested_at']))) ?></div>
         </div>
         <?php $waitHrs = (time() - strtotime($r['requested_at'])) / 3600; ?>
@@ -178,6 +179,50 @@ function form_e_last_return(PDO $pdo, int $feId): ?array {
           <div class="col-6"><span class="muted">Account created</span><br><?= $r['account_created_at'] ? e(date('M j, Y', strtotime($r['account_created_at']))) : '—' ?></div>
         </div>
         <a class="btn btn-outline-light btn-sm mt-3 w-100" href="<?= base_url('admin/users.php') ?>" target="_blank"><i class="bi bi-person-vcard me-1"></i>Open full profile in Users &amp; Approvals</a>
+      </div>
+    </div></div></div>
+
+    <!-- Readiness check — is everything Form E will eventually need already
+         on file for this student? There's no Form E record yet at this
+         pending stage (that's only created on approval), so this checks the
+         underlying data it will draw from, not a document preview. Approve
+         /Reject are repeated here so a clean check can end in an approval
+         without closing the popup first. -->
+    <?php
+    $feReady = [
+        'CNIC on file'              => !empty($r['cnic']),
+        'Father name on file'       => !empty($r['father_name']),
+        'Registration number on file' => !empty($r['reg_number']),
+        'Enrollment approved'       => $r['enrollment_status'] === 'approved',
+        'Form C approved'           => $r['form_c_status'] === 'approved',
+        'Academic advisor on file'  => !empty($r['academic_advisor'] ?? null),
+    ];
+    $feReadyCount = count(array_filter($feReady));
+    ?>
+    <div class="modal fade" id="feReqReady<?= (int)$r['id'] ?>" tabindex="-1"><div class="modal-dialog"><div class="modal-content" style="background:#11141b;border:1px solid var(--border-strong);color:var(--text);border-radius:18px">
+      <div class="modal-header border-0">
+        <h5 class="serif m-0">Readiness — <?= e($r['name']) ?></h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="font-size:13px">
+        <p class="muted" style="font-size:12px">What Form E will draw on once approved — <?= $feReadyCount ?>/<?= count($feReady) ?> ready.</p>
+        <ul class="list-unstyled mb-3">
+          <?php foreach ($feReady as $label => $ok): ?>
+          <li class="py-1" style="border-top:1px solid var(--border)"><i class="bi <?= $ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger' ?> me-2"></i><?= e($label) ?></li>
+          <?php endforeach; ?>
+        </ul>
+        <?php if ($is_admin): ?>
+        <div class="d-flex gap-2 flex-wrap">
+          <form method="post"><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+            <button class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1"></i>Approve</button>
+          </form>
+          <form method="post" class="d-flex gap-2">
+            <input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+            <input class="form-control form-control-sm" name="note" placeholder="Reason (optional)" style="width:200px">
+            <button class="btn btn-danger btn-sm" onclick="return confirm('Reject Form E access for <?= e($r['name']) ?>?')"><i class="bi bi-x-circle me-1"></i>Reject</button>
+          </form>
+        </div>
+        <?php endif; ?>
       </div>
     </div></div></div>
   <?php endforeach; ?>

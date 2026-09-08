@@ -74,7 +74,6 @@ $sections = [
         'admin/users.php'   => 'Users & Approvals',
         'admin/import.php'  => 'Bulk Import',
         'admin/settings.php'=> 'Settings',
-        'admin/security.php'=> 'Security',
         'admin/form_e_eligibility.php' => 'Form E Eligibility',
         'admin/form_e_review.php'      => 'Form E Review',
         'admin/documents.php'          => 'Document Registry',
